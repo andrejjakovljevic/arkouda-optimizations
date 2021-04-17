@@ -1,0 +1,143 @@
+Triangle Count 1d - Uncompressed
+Stats: Creates 3 temporaries, receives 4 messages
+Interesting: Temporaries are not deleted. This is dependent on the scope of the disconnect statement. The client does not
+exit the benchmark function and only has a local view.
+
+2021-03-26:00:52:33 [arkouda_server] main Line 235 INFO [Chapel] >>> "randint" ""
+2021-03-26:00:52:33 [ServerConfig] overMemLimit Line 154 INFO [Chapel] memory high watermark = 39069 memory limit = 7730941132
+2021-03-26:00:52:33 [arkouda_server] sendRepMsg Line 138 INFO [Chapel] repMsg: {"msg":"created id_1 int64 100 1 (100) 8", "msgType":"NORMAL", "msgFormat":"STRING", "user":"prashanthpai"}
+2021-03-26:00:52:33 [arkouda_server] main Line 383 INFO [Chapel] <<< randint took 0.00050200000000000244 sec
+2021-03-26:00:52:33 [arkouda_server] main Line 387 INFO [Chapel] bytes of memory used after command 41205
+2021-03-26:00:52:33 [arkouda_server] main Line 235 INFO [Chapel] >>> "binopvs" ""
+2021-03-26:00:52:33 [ServerConfig] overMemLimit Line 154 INFO [Chapel] memory high watermark = 41997 memory limit = 7730941132
+2021-03-26:00:52:33 [arkouda_server] sendRepMsg Line 138 INFO [Chapel] repMsg: {"msg":"created id_2 int64 100 1 (100) 8", "msgType":"NORMAL", "msgFormat":"STRING", "user":"prashanthpai"}
+2021-03-26:00:52:33 [arkouda_server] main Line 383 INFO [Chapel] <<< binopvs took 0.00038599999999977541 sec
+2021-03-26:00:52:33 [arkouda_server] main Line 387 INFO [Chapel] bytes of memory used after command 42677
+2021-03-26:00:52:33 [arkouda_server] main Line 235 INFO [Chapel] >>> "binopvv" ""
+2021-03-26:00:52:33 [ServerConfig] overMemLimit Line 154 INFO [Chapel] memory high watermark = 43485 memory limit = 7730941132
+2021-03-26:00:52:33 [arkouda_server] sendRepMsg Line 138 INFO [Chapel] repMsg: {"msg":"created id_3 int64 100 1 (100) 8", "msgType":"NORMAL", "msgFormat":"STRING", "user":"prashanthpai"}
+2021-03-26:00:52:33 [arkouda_server] main Line 383 INFO [Chapel] <<< binopvv took 0.00039200000000016999 sec
+2021-03-26:00:52:33 [arkouda_server] main Line 387 INFO [Chapel] bytes of memory used after command 44181
+2021-03-26:00:52:33 [arkouda_server] main Line 235 INFO [Chapel] >>> "reduction" ""
+2021-03-26:00:52:33 [arkouda_server] sendRepMsg Line 138 INFO [Chapel] repMsg: {"msg":"int64 20205", "msgType":"NORMAL", "msgFormat":"STRING", "user":"prashanthpai"}
+2021-03-26:00:52:33 [arkouda_server] main Line 383 INFO [Chapel] <<< reduction took 0.00032899999999980167 sec
+2021-03-26:00:52:33 [arkouda_server] main Line 387 INFO [Chapel] bytes of memory used after command 44165
+
+Triangle Count 1d - Compressed
+Stats: Creates 3 temporaries, receives 6 messages
+Interesting: Knows to delete temporaries that represent products, does not temporary for local variable
+
+2021-03-26:00:56:41 [arkouda_server] main Line 235 INFO [Chapel] >>> "randint" ""
+2021-03-26:00:56:41 [ServerConfig] overMemLimit Line 154 INFO [Chapel] memory high watermark = 39069 memory limit = 7730941132
+2021-03-26:00:56:41 [arkouda_server] sendRepMsg Line 138 INFO [Chapel] repMsg: {"msg":"created id_1 int64 100 1 (100) 8", "msgType":"NORMAL", "msgFormat":"STRING", "user":"prashanthpai"}
+2021-03-26:00:56:41 [arkouda_server] main Line 383 INFO [Chapel] <<< randint took 0.0039439999999997255 sec
+2021-03-26:00:56:41 [arkouda_server] main Line 387 INFO [Chapel] bytes of memory used after command 41205
+2021-03-26:00:56:41 [arkouda_server] main Line 235 INFO [Chapel] >>> "binopvs" ""
+2021-03-26:00:56:41 [ServerConfig] overMemLimit Line 154 INFO [Chapel] memory high watermark = 41997 memory limit = 7730941132
+2021-03-26:00:56:41 [arkouda_server] sendRepMsg Line 138 INFO [Chapel] repMsg: {"msg":"created id_2 int64 100 1 (100) 8", "msgType":"NORMAL", "msgFormat":"STRING", "user":"prashanthpai"}
+2021-03-26:00:56:41 [arkouda_server] main Line 383 INFO [Chapel] <<< binopvs took 0.0022359999999999047 sec
+2021-03-26:00:56:41 [arkouda_server] main Line 387 INFO [Chapel] bytes of memory used after command 42677
+2021-03-26:00:56:41 [arkouda_server] main Line 235 INFO [Chapel] >>> "binopvv" ""
+2021-03-26:00:56:41 [ServerConfig] overMemLimit Line 154 INFO [Chapel] memory high watermark = 43485 memory limit = 7730941132
+2021-03-26:00:56:41 [arkouda_server] sendRepMsg Line 138 INFO [Chapel] repMsg: {"msg":"created id_3 int64 100 1 (100) 8", "msgType":"NORMAL", "msgFormat":"STRING", "user":"prashanthpai"}
+2021-03-26:00:56:41 [arkouda_server] main Line 383 INFO [Chapel] <<< binopvv took 0.0015330000000002286 sec
+2021-03-26:00:56:41 [arkouda_server] main Line 387 INFO [Chapel] bytes of memory used after command 44293
+2021-03-26:00:56:41 [arkouda_server] main Line 235 INFO [Chapel] >>> "delete" ""
+2021-03-26:00:56:41 [arkouda_server] sendRepMsg Line 138 INFO [Chapel] repMsg: {"msg":"deleted id_2", "msgType":"NORMAL", "msgFormat":"STRING", "user":"prashanthpai"}
+2021-03-26:00:56:41 [arkouda_server] main Line 383 INFO [Chapel] <<< delete took 0.00029199999999995896 sec
+2021-03-26:00:56:41 [arkouda_server] main Line 387 INFO [Chapel] bytes of memory used after command 42565
+2021-03-26:00:56:41 [arkouda_server] main Line 235 INFO [Chapel] >>> "reduction" ""
+2021-03-26:00:56:41 [arkouda_server] sendRepMsg Line 138 INFO [Chapel] repMsg: {"msg":"int64 15835", "msgType":"NORMAL", "msgFormat":"STRING", "user":"prashanthpai"}
+2021-03-26:00:56:41 [arkouda_server] main Line 383 INFO [Chapel] <<< reduction took 0.0016060000000002184 sec
+2021-03-26:00:56:41 [arkouda_server] main Line 387 INFO [Chapel] bytes of memory used after command 42661
+2021-03-26:00:56:41 [arkouda_server] main Line 235 INFO [Chapel] >>> "delete" ""
+2021-03-26:00:56:41 [arkouda_server] sendRepMsg Line 138 INFO [Chapel] repMsg: {"msg":"deleted id_3", "msgType":"NORMAL", "msgFormat":"STRING", "user":"prashanthpai"}
+2021-03-26:00:56:41 [arkouda_server] main Line 383 INFO [Chapel] <<< delete took 0.00022099999999980469 sec
+2021-03-26:00:56:41 [arkouda_server] main Line 387 INFO [Chapel] bytes of memory used after command 41061
+
+Betweenness Centrality 1d
+Stats: Created 11 temporaries, receives 17 messages
+
+2021-03-26:02:04:11 [arkouda_server] main Line 235 INFO [Chapel] >>> "randint" ""
+2021-03-26:02:04:11 [ServerConfig] overMemLimit Line 154 INFO [Chapel] memory high watermark = 38349 memory limit = 7730941132
+2021-03-26:02:04:11 [arkouda_server] sendRepMsg Line 138 INFO [Chapel] repMsg: {"msg":"created id_1 int64 10 1 (10) 8", "msgType":"NORMAL", "msgFormat":"STRING", "user":"prashanthpai"}
+2021-03-26:02:04:11 [arkouda_server] main Line 383 INFO [Chapel] <<< randint took 0.0033659999999999801 sec
+2021-03-26:02:04:11 [arkouda_server] main Line 387 INFO [Chapel] bytes of memory used after command 40469
+2021-03-26:02:04:11 [arkouda_server] main Line 235 INFO [Chapel] >>> "create" ""
+2021-03-26:02:04:11 [ServerConfig] overMemLimit Line 154 INFO [Chapel] memory high watermark = 40453 memory limit = 7730941132
+2021-03-26:02:04:11 [ServerConfig] overMemLimit Line 154 INFO [Chapel] memory high watermark = 40461 memory limit = 7730941132
+2021-03-26:02:04:11 [arkouda_server] sendRepMsg Line 138 INFO [Chapel] repMsg: {"msg":"created id_2 int64 10 1 (10) 8", "msgType":"NORMAL", "msgFormat":"STRING", "user":"prashanthpai"}
+2021-03-26:02:04:11 [arkouda_server] main Line 383 INFO [Chapel] <<< create took 0.00065900000000002068 sec
+2021-03-26:02:04:11 [arkouda_server] main Line 387 INFO [Chapel] bytes of memory used after command 41157
+2021-03-26:02:04:11 [arkouda_server] main Line 235 INFO [Chapel] >>> "create" ""
+2021-03-26:02:04:11 [ServerConfig] overMemLimit Line 154 INFO [Chapel] memory high watermark = 41237 memory limit = 7730941132
+2021-03-26:02:04:11 [ServerConfig] overMemLimit Line 154 INFO [Chapel] memory high watermark = 41245 memory limit = 7730941132
+2021-03-26:02:04:11 [arkouda_server] sendRepMsg Line 138 INFO [Chapel] repMsg: {"msg":"created id_3 int64 10 1 (10) 8", "msgType":"NORMAL", "msgFormat":"STRING", "user":"prashanthpai"}
+2021-03-26:02:04:11 [arkouda_server] main Line 383 INFO [Chapel] <<< create took 0.00045300000000000895 sec
+2021-03-26:02:04:11 [arkouda_server] main Line 387 INFO [Chapel] bytes of memory used after command 41941
+2021-03-26:02:04:11 [arkouda_server] main Line 235 INFO [Chapel] >>> "create" ""
+2021-03-26:02:04:11 [ServerConfig] overMemLimit Line 154 INFO [Chapel] memory high watermark = 42021 memory limit = 7730941132
+2021-03-26:02:04:11 [ServerConfig] overMemLimit Line 154 INFO [Chapel] memory high watermark = 42029 memory limit = 7730941132
+2021-03-26:02:04:11 [arkouda_server] sendRepMsg Line 138 INFO [Chapel] repMsg: {"msg":"created id_4 int64 10 1 (10) 8", "msgType":"NORMAL", "msgFormat":"STRING", "user":"prashanthpai"}
+2021-03-26:02:04:11 [arkouda_server] main Line 383 INFO [Chapel] <<< create took 0.00038900000000000046 sec
+2021-03-26:02:04:11 [arkouda_server] main Line 387 INFO [Chapel] bytes of memory used after command 42837
+2021-03-26:02:04:11 [arkouda_server] main Line 235 INFO [Chapel] >>> "[int]=val" ""
+2021-03-26:02:04:11 [arkouda_server] sendRepMsg Line 138 INFO [Chapel] repMsg: {"msg":"setIntIndexToValueMsg success", "msgType":"NORMAL", "msgFormat":"STRING", "user":"prashanthpai"}
+2021-03-26:02:04:11 [arkouda_server] main Line 383 INFO [Chapel] <<< [int]=val took 0.00063099999999999268 sec
+2021-03-26:02:04:11 [arkouda_server] main Line 387 INFO [Chapel] bytes of memory used after command 42805
+2021-03-26:02:04:11 [arkouda_server] main Line 235 INFO [Chapel] >>> "binopvv" ""
+2021-03-26:02:04:11 [ServerConfig] overMemLimit Line 154 INFO [Chapel] memory high watermark = 42893 memory limit = 7730941132
+2021-03-26:02:04:11 [arkouda_server] sendRepMsg Line 138 INFO [Chapel] repMsg: {"msg":"created id_5 int64 10 1 (10) 8", "msgType":"NORMAL", "msgFormat":"STRING", "user":"prashanthpai"}
+2021-03-26:02:04:11 [arkouda_server] main Line 383 INFO [Chapel] <<< binopvv took 0.0016889999999999961 sec
+2021-03-26:02:04:11 [arkouda_server] main Line 387 INFO [Chapel] bytes of memory used after command 43573
+2021-03-26:02:04:11 [arkouda_server] main Line 235 INFO [Chapel] >>> "[int]" ""
+2021-03-26:02:04:11 [arkouda_server] sendRepMsg Line 138 INFO [Chapel] repMsg: {"msg":"item int64 0", "msgType":"NORMAL", "msgFormat":"STRING", "user":"prashanthpai"}
+2021-03-26:02:04:11 [arkouda_server] main Line 383 INFO [Chapel] <<< [int] took 0.0010239999999999971 sec
+2021-03-26:02:04:11 [arkouda_server] main Line 387 INFO [Chapel] bytes of memory used after command 43477
+2021-03-26:02:04:11 [arkouda_server] main Line 235 INFO [Chapel] >>> "[int]=val" ""
+2021-03-26:02:04:11 [arkouda_server] sendRepMsg Line 138 INFO [Chapel] repMsg: {"msg":"setIntIndexToValueMsg success", "msgType":"NORMAL", "msgFormat":"STRING", "user":"prashanthpai"}
+2021-03-26:02:04:11 [arkouda_server] main Line 383 INFO [Chapel] <<< [int]=val took 0.00025700000000000722 sec
+2021-03-26:02:04:11 [arkouda_server] main Line 387 INFO [Chapel] bytes of memory used after command 43589
+2021-03-26:02:04:11 [arkouda_server] main Line 235 INFO [Chapel] >>> "binopvv" ""
+2021-03-26:02:04:11 [ServerConfig] overMemLimit Line 154 INFO [Chapel] memory high watermark = 43677 memory limit = 7730941132
+2021-03-26:02:04:11 [arkouda_server] sendRepMsg Line 138 INFO [Chapel] repMsg: {"msg":"created id_6 int64 10 1 (10) 8", "msgType":"NORMAL", "msgFormat":"STRING", "user":"prashanthpai"}
+2021-03-26:02:04:11 [arkouda_server] main Line 383 INFO [Chapel] <<< binopvv took 0.00083300000000000041 sec
+2021-03-26:02:04:11 [arkouda_server] main Line 387 INFO [Chapel] bytes of memory used after command 44357
+2021-03-26:02:04:11 [arkouda_server] main Line 235 INFO [Chapel] >>> "delete" ""
+2021-03-26:02:04:11 [arkouda_server] sendRepMsg Line 138 INFO [Chapel] repMsg: {"msg":"deleted id_4", "msgType":"NORMAL", "msgFormat":"STRING", "user":"prashanthpai"}
+2021-03-26:02:04:11 [arkouda_server] main Line 383 INFO [Chapel] <<< delete took 0.00021900000000002473 sec
+2021-03-26:02:04:11 [arkouda_server] main Line 387 INFO [Chapel] bytes of memory used after command 43477
+2021-03-26:02:04:11 [arkouda_server] main Line 235 INFO [Chapel] >>> "binopvv" ""
+2021-03-26:02:04:11 [arkouda_server] sendRepMsg Line 138 INFO [Chapel] repMsg: {"msg":"created id_7 int64 10 1 (10) 8", "msgType":"NORMAL", "msgFormat":"STRING", "user":"prashanthpai"}
+2021-03-26:02:04:11 [arkouda_server] main Line 383 INFO [Chapel] <<< binopvv took 0.00040300000000001446 sec
+2021-03-26:02:04:11 [arkouda_server] main Line 387 INFO [Chapel] bytes of memory used after command 44357
+2021-03-26:02:04:11 [arkouda_server] main Line 235 INFO [Chapel] >>> "delete" ""
+2021-03-26:02:04:11 [arkouda_server] sendRepMsg Line 138 INFO [Chapel] repMsg: {"msg":"deleted id_5", "msgType":"NORMAL", "msgFormat":"STRING", "user":"prashanthpai"}
+2021-03-26:02:04:11 [arkouda_server] main Line 383 INFO [Chapel] <<< delete took 0.00020000000000000573 sec
+2021-03-26:02:04:11 [arkouda_server] main Line 387 INFO [Chapel] bytes of memory used after command 43477
+2021-03-26:02:04:11 [arkouda_server] main Line 235 INFO [Chapel] >>> "reduction" ""
+2021-03-26:02:04:11 [arkouda_server] sendRepMsg Line 138 INFO [Chapel] repMsg: {"msg":"int64 16", "msgType":"NORMAL", "msgFormat":"STRING", "user":"prashanthpai"}
+2021-03-26:02:04:11 [arkouda_server] main Line 383 INFO [Chapel] <<< reduction took 0.0010059999999999791 sec
+2021-03-26:02:04:11 [arkouda_server] main Line 387 INFO [Chapel] bytes of memory used after command 43573
+2021-03-26:02:04:11 [arkouda_server] main Line 235 INFO [Chapel] >>> "create" ""
+2021-03-26:02:04:11 [arkouda_server] sendRepMsg Line 138 INFO [Chapel] repMsg: {"msg":"created id_8 int64 10 1 (10) 8", "msgType":"NORMAL", "msgFormat":"STRING", "user":"prashanthpai"}
+2021-03-26:02:04:11 [arkouda_server] main Line 383 INFO [Chapel] <<< create took 0.00029999999999999472 sec
+2021-03-26:02:04:11 [arkouda_server] main Line 387 INFO [Chapel] bytes of memory used after command 44293
+2021-03-26:02:04:11 [arkouda_server] main Line 235 INFO [Chapel] >>> "create" ""
+2021-03-26:02:04:11 [ServerConfig] overMemLimit Line 154 INFO [Chapel] memory high watermark = 44373 memory limit = 7730941132
+2021-03-26:02:04:11 [ServerConfig] overMemLimit Line 154 INFO [Chapel] memory high watermark = 44381 memory limit = 7730941132
+2021-03-26:02:04:11 [arkouda_server] sendRepMsg Line 138 INFO [Chapel] repMsg: {"msg":"created id_9 int64 10 1 (10) 8", "msgType":"NORMAL", "msgFormat":"STRING", "user":"prashanthpai"}
+2021-03-26:02:04:11 [arkouda_server] main Line 383 INFO [Chapel] <<< create took 0.00046700000000002295 sec
+2021-03-26:02:04:11 [arkouda_server] main Line 387 INFO [Chapel] bytes of memory used after command 45077
+2021-03-26:02:04:11 [arkouda_server] main Line 235 INFO [Chapel] >>> "create" ""
+2021-03-26:02:04:11 [ServerConfig] overMemLimit Line 154 INFO [Chapel] memory high watermark = 45157 memory limit = 7730941132
+2021-03-26:02:04:11 [ServerConfig] overMemLimit Line 154 INFO [Chapel] memory high watermark = 45165 memory limit = 7730941132
+2021-03-26:02:04:11 [arkouda_server] sendRepMsg Line 138 INFO [Chapel] repMsg: {"msg":"created id_10 int64 10 1 (10) 8", "msgType":"NORMAL", "msgFormat":"STRING", "user":"prashanthpai"}
+2021-03-26:02:04:11 [arkouda_server] main Line 383 INFO [Chapel] <<< create took 0.00042999999999998595 sec
+2021-03-26:02:04:11 [arkouda_server] main Line 387 INFO [Chapel] bytes of memory used after command 45861
+2021-03-26:02:04:11 [arkouda_server] main Line 235 INFO [Chapel] >>> "create" ""
+2021-03-26:02:04:11 [ServerConfig] overMemLimit Line 154 INFO [Chapel] memory high watermark = 45941 memory limit = 7730941132
+2021-03-26:02:04:11 [ServerConfig] overMemLimit Line 154 INFO [Chapel] memory high watermark = 45949 memory limit = 7730941132
+2021-03-26:02:04:11 [arkouda_server] sendRepMsg Line 138 INFO [Chapel] repMsg: {"msg":"created id_11 int64 10 1 (10) 8", "msgType":"NORMAL", "msgFormat":"STRING", "user":"prashanthpai"}
+2021-03-26:02:04:11 [arkouda_server] main Line 383 INFO [Chapel] <<< create took 0.0004679999999999962 sec
+2021-03-26:02:04:11 [arkouda_server] main Line 387 INFO [Chapel] bytes of memory used after command 46645
