@@ -1,0 +1,18 @@
+2021-03-04:12:51:59 [arkouda_server] main Line 221 INFO [Chapel] >>> "connect" ""
+2021-03-04:12:51:59 [arkouda_server] sendRepMsg Line 113 INFO [Chapel] repMsg: {"msg":"connected to arkouda server tcp://*:5555", "msgType":"NORMAL", "msgFormat":"STRING", "user":"pbp2"}
+2021-03-04:12:51:59 [arkouda_server] main Line 371 INFO [Chapel] <<< connect took 0.00028099999999930958 sec
+2021-03-04:12:51:59 [arkouda_server] main Line 221 INFO [Chapel] >>> "getconfig" ""
+2021-03-04:12:51:59 [arkouda_server] sendRepMsg Line 113 INFO [Chapel] repMsg: {"msg":"{\"arkoudaVersion\":\"\", \"ZMQVersion\":\"4.2.3\", \"HDF5Version\":\"1.10.5\", \"serverHostname\":\"nid00751\", \"ServerPort\":5555, \"numLocales\":1, \"numPUs\":32, \"maxTaskPar\":32, \"physicalMemory\":135060557824, \"distributionType\":\"domain(1,int(64),false)\", \"LocaleConfigs\":[{\"id\":0, \"name\":\"nid00751\", \"numPUs\":32, \"maxTaskPar\":32, \"physicalMemory\":135060557824}], \"authenticate\":false}", "msgType":"NORMAL", "msgFormat":"STRING", "user":"pbp2"}
+2021-03-04:12:51:59 [arkouda_server] main Line 371 INFO [Chapel] <<< getconfig took 0.00045400000000128671 sec
+2021-03-04:12:51:59 [arkouda_server] main Line 221 INFO [Chapel] >>> "randint" ""
+2021-03-04:12:51:59 [arkouda_server] sendRepMsg Line 113 INFO [Chapel] repMsg: {"msg":"created id_1 int64 10000 1 (10000) 8", "msgType":"NORMAL", "msgFormat":"STRING", "user":"pbp2"}
+2021-03-04:12:51:59 [arkouda_server] main Line 371 INFO [Chapel] <<< randint took 0.0078170000000010731 sec
+2021-03-04:12:51:59 [arkouda_server] main Line 221 INFO [Chapel] >>> "binopvv" ""
+2021-03-04:12:51:59 [arkouda_server] sendRepMsg Line 113 INFO [Chapel] repMsg: {"msg":"created id_2 int64 10000 1 (10000) 8", "msgType":"NORMAL", "msgFormat":"STRING", "user":"pbp2"}
+2021-03-04:12:51:59 [arkouda_server] main Line 371 INFO [Chapel] <<< binopvv took 0.0012110000000014054 sec
+2021-03-04:12:51:59 [arkouda_server] main Line 221 INFO [Chapel] >>> "delete" ""
+2021-03-04:12:51:59 [arkouda_server] sendRepMsg Line 113 INFO [Chapel] repMsg: {"msg":"deleted id_2", "msgType":"NORMAL", "msgFormat":"STRING", "user":"pbp2"}
+2021-03-04:12:51:59 [arkouda_server] main Line 371 INFO [Chapel] <<< delete took 0.00051999999999985391 sec
+2021-03-04:12:51:59 [arkouda_server] main Line 221 INFO [Chapel] >>> "shutdown" ""
+2021-03-04:12:51:59 [arkouda_server] main Line 237 INFO [Chapel] <<< shutdown initiated by pbp2 took 0.00029299999999921056 sec
+2021-03-04:12:51:59 [arkouda_server] main Line 399 INFO [Chapel] requests = 6 responseCount = 6 elapsed sec = 13
