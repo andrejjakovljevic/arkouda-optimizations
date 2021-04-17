@@ -14,9 +14,10 @@ from arkouda.logger import getArkoudaLogger
 from arkouda.infoclass import list_registry, information, pretty_print_information
 import builtins
 
-__all__ = ["pdarray", "clear", "any", "all", "is_sorted", "sum", "prod", "min", "max", "argmin",
-           "argmax", "mean", "var", "std", "mink", "maxk", "argmink", "argmaxk", "attach_pdarray",
-           "unregister_pdarray_by_name", "RegistrationError"]
+__all__ = ["pdarray", "info", "clear", "any", "all", "is_sorted", "list_registry", "sum", "prod",
+           "min", "max", "argmin", "argmax", "mean", "var", "std", "mink",
+           "maxk", "argmink", "argmaxk", "attach_pdarray",
+           "unregister_pdarray", "RegistrationError", "multAndStore"]
 
 logger = getArkoudaLogger(name='pdarrayclass')    
 
@@ -1863,6 +1864,12 @@ def unregister_pdarray_by_name(user_defined_name:str) -> None:
     """
     repMsg = generic_msg(cmd="unregister", args=user_defined_name)
 
+@typechecked
+def multAndStore(pda_left: pdarray, pda_right: pdarray, pda_store: pdarray) -> None:
+    cmd = "binopvvStore"
+    args = "{} {} {} {}". \
+        format("*", pda_left.name, pda_right.name, pda_store.name)
+    repMsg = generic_msg(cmd=cmd, args=args)
 
 # TODO In the future move this to a specific errors file
 class RegistrationError(Exception):

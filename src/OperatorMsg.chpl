@@ -1671,4 +1671,55 @@ module OperatorMsg
         omLogger.debug(getModuleName(),getRoutineName(),getLineNumber(),repMsg);
         return new MsgTuple(repMsg, MsgType.NORMAL);
     }
+
+        proc binopvvStoreMsg(cmd: string, payload: string, st: borrowed SymTab): MsgTuple throws {
+        param pn = Reflection.getRoutineName();
+        var repMsg: string; // response message
+
+        // split request into fields
+        var (op, aname, bname, store) = payload.splitMsgToTuple(4);
+
+        var left: borrowed GenSymEntry = st.lookup(aname);
+        var right: borrowed GenSymEntry = st.lookup(bname);
+        var res: borrowed GenSymEntry = st.lookup(store);
+
+        omLogger.debug(getModuleName(), getRoutineName(), getLineNumber(),
+             "cmd: %t op: %t left pdarray: %t right pdarray: %t store pdarray: %t".format(
+                                          cmd,op,st.attrib(aname),st.attrib(bname),st.attrib(store)));
+
+        select (left.dtype, right.dtype) {
+            when (DType.Int64, DType.Int64) {
+                var l = toSymEntry(left,int);
+                var r = toSymEntry(right,int);
+                var s = toSymEntry(res,int);
+                select op
+                {
+                    when "+" {
+                        s.a = l.a + r.a;
+                    }
+                    when "-" {
+                        s.a = l.a - r.a;
+                    }
+                    when "*" {
+                        s.a = l.a * r.a;
+                    }
+                    otherwise {
+                        var errorMsg = notImplementedError(pn,left.dtype,op,right.dtype);
+                        omLogger.error(getModuleName(),getRoutineName(),getLineNumber(),errorMsg);
+                        return new MsgTuple(errorMsg, MsgType.ERROR);
+                    }
+                }
+            }
+            otherwise {
+                var errorMsg = unrecognizedTypeError(pn,
+                                  "("+dtype2str(left.dtype)+","+dtype2str(right.dtype)+")");
+                omLogger.error(getModuleName(),getRoutineName(),getLineNumber(),errorMsg);
+                return new MsgTuple(errorMsg, MsgType.ERROR);
+            }
+        }
+
+        repMsg = "updated %s".format(st.attrib(store));
+        omLogger.debug(getModuleName(),getRoutineName(),getLineNumber(),repMsg);
+        return new MsgTuple(repMsg, MsgType.NORMAL);
+    }
 }

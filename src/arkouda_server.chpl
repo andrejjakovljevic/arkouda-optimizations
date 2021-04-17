@@ -320,6 +320,7 @@ proc main() {
                 when "create"            {repTuple = createMsg(cmd, args, st);}
                 when "delete"            {repTuple = deleteMsg(cmd, args, st);}
                 when "binopvv"           {repTuple = binopvvMsg(cmd, args, st);}
+                when "binopvvStore"      {repTuple = binopvvStoreMsg(cmd, args, st);}
                 when "binopvs"           {repTuple = binopvsMsg(cmd, args, st);}
                 when "binopsv"           {repTuple = binopsvMsg(cmd, args, st);}
                 when "opeqvv"            {repTuple = opeqvvMsg(cmd, args, st);}
