@@ -1,733 +1,842 @@
-import json, os
-from typing import cast, Mapping, Optional, Tuple, Union
-import warnings, pkg_resources
-import zmq  # type: ignore
-import pyfiglet  # type: ignore
-from arkouda import security, io_util
-from arkouda.logger import getArkoudaLogger
-from arkouda.message import RequestMessage, MessageFormat, ReplyMessage, \
-    MessageType
-from queue import Queue
+import numpy as np  # type: ignore
+import pandas as pd  # type: ignore
+import struct
+from typing import cast, Iterable, Optional, Union
+from typeguard import typechecked
+from arkouda.client import generic_msg
+from arkouda.dtypes import structDtypeCodes, NUMBER_FORMAT_STRINGS, float64, int64, \
+    DTypes, isSupportedInt, isSupportedNumber, NumericDTypes, SeriesDTypes, \
+    int_scalars, numeric_scalars
+from arkouda.dtypes import dtype as akdtype
+from arkouda.pdarrayclass import pdarray, create_pdarray, check_arr, uncache_array
+from arkouda.strings import Strings
 
-__all__ = ["AllSymbols", "connect", "disconnect", "shutdown", "get_config",
-           "get_mem_used", "__version__", "ruok", "generic_msg"]
-
-# Try to read the version from the file located at ../VERSION
-VERSIONFILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-                           "VERSION")
-if os.path.isfile(VERSIONFILE):
-    with open(VERSIONFILE, 'r') as f:
-        __version__ = f.read().strip()
-else:
-    # Fall back to the version defined at build time in setup.py
-    # pkg_resources is a subpackage of setuptools
-    # __package__ is the name of the current package, i.e. "arkouda"
-    __version__ = pkg_resources.require(__package__)[0].version
-
-# stuff for zmq connection
-pspStr = ''
-context = zmq.Context()
-socket = context.socket(zmq.REQ)
-connected = False
-# username and token for when basic authentication is enabled
-username = ''
-token = ''
-# verbose flag for arkouda module
-verboseDefVal = False
-verbose = verboseDefVal
-# threshold for __iter__() to limit comms to arkouda_server
-pdarrayIterThreshDefVal = 100
-pdarrayIterThresh = pdarrayIterThreshDefVal
-maxTransferBytesDefVal = 2 ** 30
-maxTransferBytes = maxTransferBytesDefVal
-AllSymbols = "__AllSymbols__"
-
-logger = getArkoudaLogger(name='Arkouda Client')
-clientLogger = getArkoudaLogger(name='Arkouda User Logger', logFormat='%(message)s')
-
-# Print splash message
-print('{}'.format(pyfiglet.figlet_format('Arkouda')))
-print('Client Version: {}'.format(__version__))
-
-q = Queue(5)
-client_to_server_names = {}
+__all__ = ["array", "zeros", "ones", "zeros_like", "ones_like",
+           "arange", "linspace", "randint", "uniform", "standard_normal",
+           "random_strings_uniform", "random_strings_lognormal",
+           "from_series"
+           ]
 
 
-# reset settings to default values
-def set_defaults() -> None:
+@typechecked
+def from_series(series: pd.Series,
+                dtype: Optional[Union[type, str]] = None) -> Union[pdarray, Strings]:
     """
-    Sets client variables including verbose, maxTransferBytes and
-    pdarrayIterThresh to default values.
-
-    Returns
-    -------
-    None
-    """
-    global verbose, maxTransferBytes, pdarrayIterThresh
-    verbose = verboseDefVal
-    pdarrayIterThresh = pdarrayIterThreshDefVal
-    maxTransferBytes = maxTransferBytesDefVal
-
-
-# create context, request end of socket, and connect to it
-def connect(server: str = "localhost", port: int = 5555, timeout: int = 0,
-            access_token: str = None, connect_url=None) -> None:
-    """
-    Connect to a running arkouda server.
+    Converts a Pandas Series to an Arkouda pdarray or Strings object. If
+    dtype is None, the dtype is inferred from the Pandas Series. Otherwise,
+    the dtype parameter is set if the dtype of the Pandas Series is to be
+    overridden or is  unknown (for example, in situations where the Series
+    dtype is object).
 
     Parameters
     ----------
-    server : str, optional
-        The hostname of the server (must be visible to the current
-        machine). Defaults to `localhost`.
-    port : int, optional
-        The port of the server. Defaults to 5555.
-    timeout : int, optional
-        The timeout in seconds for client send and receive operations.
-        Defaults to 0 seconds, whicn is interpreted as no timeout.
-    access_token : str, optional
-        The token used to connect to an existing socket to enable access to
-        an Arkouda server where authentication is enabled. Defaults to None.
-    connect_url : str, optional
-        The complete url in the format of tcp://server:port?token=<token_value>
-        where the token is optional
+    series : Pandas Series
+        The Pandas Series with a dtype of bool, float64, int64, or string
+    dtype : Optional[type]
+        The valid dtype types are np.bool, np.float64, np.int64, and np.str
 
     Returns
     -------
-    None
+    Union[pdarray,Strings]
 
     Raises
     ------
-    ConnectionError
-        Raised if there's an error in connecting to the Arkouda server
+    TypeError
+        Raised if series is not a Pandas Series object
     ValueError
-        Raised if there's an error in parsing the connect_url parameter
-    RuntimeError
-        Raised if there is a server-side error
+        Raised if the Series dtype is not bool, float64, int64, string, datetime, or timedelta
+
+    Examples
+    --------
+    >>> ak.from_series(pd.Series(np.random.randint(0,10,5)))
+    array([9, 0, 4, 7, 9])
+
+    >>> ak.from_series(pd.Series(['1', '2', '3', '4', '5']),dtype=np.int64)
+    array([1, 2, 3, 4, 5])
+
+    >>> ak.from_series(pd.Series(np.random.uniform(low=0.0,high=1.0,size=3)))
+    array([0.57600036956445599, 0.41619265571741659, 0.6615356693784662])
+
+    >>> ak.from_series(pd.Series(['0.57600036956445599', '0.41619265571741659',
+                       '0.6615356693784662']), dtype=np.float64)
+    array([0.57600036956445599, 0.41619265571741659, 0.6615356693784662])
+
+    >>> ak.from_series(pd.Series(np.random.choice([True, False],size=5)))
+    array([True, False, True, True, True])
+
+    >>> ak.from_series(pd.Series(['True', 'False', 'False', 'True', 'True']), dtype=np.bool)
+    array([True, True, True, True, True])
+
+    >>> ak.from_series(pd.Series(['a', 'b', 'c', 'd', 'e'], dtype="string"))
+    array(['a', 'b', 'c', 'd', 'e'])
+
+    >>> ak.from_series(pd.Series(['a', 'b', 'c', 'd', 'e']),dtype=np.str)
+    array(['a', 'b', 'c', 'd', 'e'])
+
+    >>> ak.from_series(pd.Series(pd.to_datetime(['1/1/2018', np.datetime64('2018-01-01')])))
+    array([1514764800000000000, 1514764800000000000])
 
     Notes
     -----
-    On success, prints the connected address, as seen by the server. If called
-    with an existing connection, the socket will be re-initialized.
+    The supported datatypes are bool, float64, int64, string, and datetime64[ns]. The
+    data type is either inferred from the the Series or is set via the dtype parameter.
+
+    Series of datetime or timedelta are converted to Arkouda arrays of dtype int64 (nanoseconds)
+
+    A Pandas Series containing strings has a dtype of object. Arkouda assumes the Series
+    contains strings and sets the dtype to str
     """
-    global context, socket, pspStr, connected, verbose, username, token
-
-    logger.debug("ZMQ version: {}".format(zmq.zmq_version()))
-
-    if connect_url:
-        url_values = _parse_url(connect_url)
-        server = url_values[0]
-        port = url_values[1]
-        if len(url_values) == 3:
-            access_token = url_values[2]
-
-    # "protocol://server:port"
-    pspStr = "tcp://{}:{}".format(server, port)
-
-    # check to see if tunnelled connection is desired. If so, start tunnel
-    tunnel_server = os.getenv('ARKOUDA_TUNNEL_SERVER')
-    if tunnel_server:
-        (pspStr, _) = _start_tunnel(addr=pspStr, tunnel_server=tunnel_server)
-
-    logger.debug("psp = {}".format(pspStr))
-
-    # create and configure socket for connections to arkouda server
-    socket = context.socket(zmq.REQ)  # request end of the zmq connection
-
-    # if timeout is specified, set send and receive timeout params
-    if timeout > 0:
-        socket.setsockopt(zmq.SNDTIMEO, timeout * 1000)
-        socket.setsockopt(zmq.RCVTIMEO, timeout * 1000)
-
-    # set token and username global variables
-    username = security.get_username()
-    token = cast(str, _set_access_token(access_token=access_token,
-                                        connect_string=pspStr))
-
-    # connect to arkouda server
+    if not dtype:
+        dt = series.dtype.name
+    else:
+        dt = str(dtype)
     try:
-        socket.connect(pspStr)
-    except Exception as e:
-        raise ConnectionError(e)
+        '''
+        If the Series has a object dtype, set dtype to string to comply with method
+        signature that does not require a dtype; this is required because Pandas can infer
+        non-str dtypes from the input np or Python array.
+        '''
+        if dt == 'object':
+            dt = 'string'
 
-    # send the connect message
-    cmd = "connect"
-    logger.debug("[Python] Sending request: {}".format(cmd))
-
-    # send connect request to server and get the response confirming if
-    # the connect request succeeded and, if not not, the error message
-    return_message = _send_string_message(cmd=cmd)
-    logger.debug("[Python] Received response: {}".format(str(return_message)))
-    connected = True
-
-    conf = get_config()
-    if conf['arkoudaVersion'] != __version__:
-        warnings.warn(('Version mismatch between client ({}) and server ({}); ' +
-                       'this may cause some commands to fail or behave ' +
-                       'incorrectly! Updating arkouda is strongly recommended.'). \
-                      format(__version__, conf['arkoudaVersion']), RuntimeWarning)
-    clientLogger.info(return_message)
+        n_array = series.to_numpy(dtype=SeriesDTypes[dt])
+    except KeyError:
+        raise ValueError(('dtype {} is unsupported. Supported dtypes are bool, ' +
+                          'float64, int64, string, datetime64[ns], and timedelta64[ns]').format(dt))
+    return array(n_array)
 
 
-def _parse_url(url: str) -> Tuple[str, int, Optional[str]]:
+def array(a: Union[pdarray, np.ndarray, Iterable]) -> Union[pdarray, Strings]:
     """
-    Parses the url in the following format if authentication enabled:
-
-    tcp://<hostname/url>:<port>?token=<token>
-
-    If authentication is not enabled, the url is expected to be in the format:
-
-    tcp://<hostname/url>:<port>
+    Convert a Python or Numpy Iterable to a pdarray or Strings object, sending
+    the corresponding data to the arkouda server.
 
     Parameters
     ----------
-    url : str
-        The url string
+    a : Union[pdarray, np.ndarray]
+        Rank-1 array of a supported dtype
 
     Returns
     -------
-    Tuple[str,int,Optional[str]]
-        A tuple containing the host, port, and token, the latter of which is None
-        if authentication is not enabled for the Arkouda server being accessed
+    pdarray or Strings
+        A pdarray instance stored on arkouda server or Strings instance, which
+        is composed of two pdarrays stored on arkouda server
+
+    Raises
+    ------
+    TypeError
+        Raised if a is not a pdarray, np.ndarray, or Python Iterable such as a
+        list, array, tuple, or deque
+    RuntimeError
+        Raised if a is not one-dimensional, nbytes > maxTransferBytes, a.dtype is
+        not supported (not in DTypes), or if the product of a size and
+        a.itemsize > maxTransferBytes
+    ValueError
+        Raised if the returned message is malformed or does not contain the fields
+        required to generate the array.
+
+    See Also
+    --------
+    pdarray.to_ndarray
+
+    Notes
+    -----
+    The number of bytes in the input array cannot exceed `arkouda.maxTransferBytes`,
+    otherwise a RuntimeError will be raised. This is to protect the user
+    from overwhelming the connection between the Python client and the arkouda
+    server, under the assumption that it is a low-bandwidth connection. The user
+    may override this limit by setting ak.maxTransferBytes to a larger value,
+    but should proceed with caution.
+
+    If the pdrray or ndarray is of type U, this method is called twice recursively
+    to create the Strings object and the two corresponding pdarrays for string
+    bytes and offsets, respectively.
+
+    Examples
+    --------
+    >>> ak.array(np.arange(1,10))
+    array([1, 2, 3, 4, 5, 6, 7, 8, 9])
+
+    >>> ak.array(range(1,10))
+    array([1, 2, 3, 4, 5, 6, 7, 8, 9])
+
+    >>> strings = ak.array(['string {}'.format(i) for i in range(0,5)])
+    >>> type(strings)
+    <class 'arkouda.strings.Strings'>
+    """
+    # If a is already a pdarray, do nothing
+    if isinstance(a, pdarray):
+        return a
+    from arkouda.client import maxTransferBytes
+    # If a is not already a numpy.ndarray, convert it
+    if not isinstance(a, np.ndarray):
+        try:
+            a = np.array(a)
+        except:
+            raise TypeError(('a must be a pdarray, np.ndarray, or convertible to' +
+                             ' a numpy array'))
+    # Only rank 1 arrays currently supported
+    if a.ndim != 1:
+        raise RuntimeError("Only rank-1 pdarrays or ndarrays supported")
+    # Check if array of strings
+    if a.dtype.kind == 'U' or 'U' in a.dtype.kind:
+        encoded = np.array([elem.encode() for elem in a])
+        # Length of each string, plus null byte terminator
+        lengths = np.array([len(elem) for elem in encoded]) + 1
+        # Compute zero-up segment offsets
+        offsets = np.cumsum(lengths) - lengths
+        # Allocate and fill bytes array with string segments
+        nbytes = offsets[-1] + lengths[-1]
+        if nbytes > maxTransferBytes:
+            raise RuntimeError(("Creating pdarray would require transferring {} bytes," +
+                                " which exceeds allowed transfer size. Increase " +
+                                "ak.maxTransferBytes to force.").format(nbytes))
+        values = np.zeros(nbytes, dtype=np.uint8)
+        for s, o in zip(encoded, offsets):
+            for i, b in enumerate(s):
+                values[o + i] = b
+        # Recurse to create pdarrays for offsets and values, then return Strings object
+        return Strings(cast(pdarray, array(offsets)), cast(pdarray, array(values)))
+    # If not strings, then check that dtype is supported in arkouda
+    if a.dtype.name not in DTypes:
+        raise RuntimeError("Unhandled dtype {}".format(a.dtype))
+    # Do not allow arrays that are too large
+    size = a.size
+    if (size * a.itemsize) > maxTransferBytes:
+        raise RuntimeError(("Array exceeds allowed transfer size. Increase " +
+                            "ak.maxTransferBytes to allow"))
+    # Pack binary array data into a bytes object with a command header
+    # including the dtype and size
+    fmt = ">{:n}{}".format(size, structDtypeCodes[a.dtype.name])
+    req_msg = "{} {:n} ". \
+                  format(a.dtype.name, size).encode() + struct.pack(fmt, *a)
+    repMsg = generic_msg(cmd='array', args=req_msg, send_bytes=True)
+    return create_pdarray(repMsg)
+
+
+def zeros(size: int_scalars, dtype: type = np.float64) -> pdarray:
+    """
+    Create a pdarray filled with zeros.
+
+    Parameters
+    ----------
+    size : int_scalars
+        Size of the array (only rank-1 arrays supported)
+    dtype : all_scalars
+        Type of resulting array, default float64
+
+    Returns
+    -------
+    pdarray
+        Zeros of the requested size and dtype
+
+    Raises
+    ------
+    TypeError
+        Raised if the supplied dtype is not supported or if the size
+        parameter is neither an int nor a str that is parseable to an int.
+
+    See Also
+    --------
+    ones, zeros_like
+
+    Examples
+    --------
+    >>> ak.zeros(5, dtype=ak.int64)
+    array([0, 0, 0, 0, 0])
+
+    >>> ak.zeros(5, dtype=ak.float64)
+    array([0, 0, 0, 0, 0])
+
+    >>> ak.zeros(5, dtype=ak.bool)
+    array([False, False, False, False, False])
+    """
+    if not np.isscalar(size):
+        raise TypeError("size must be a scalar, not {}". \
+                        format(size.__class__.__name__))
+    dtype = akdtype(dtype)  # normalize dtype
+    # check dtype for error
+    if cast(np.dtype, dtype).name not in NumericDTypes:
+        raise TypeError("unsupported dtype {}".format(dtype))
+    repMsg = generic_msg(cmd="create", args="{} {}".format(
+        cast(np.dtype, dtype).name, size))
+
+    return create_pdarray(repMsg)
+
+
+def ones(size: int_scalars, dtype: type = float64) -> pdarray:
+    """
+    Create a pdarray filled with ones.
+
+    Parameters
+    ----------
+    size : int_scalars
+        Size of the array (only rank-1 arrays supported)
+    dtype : Union[float64, int64, bool]
+        Resulting array type, default float64
+
+    Returns
+    -------
+    pdarray
+        Ones of the requested size and dtype
+
+    Raises
+    ------
+    TypeError
+        Raised if the supplied dtype is not supported or if the size
+        parameter is neither an int nor a str that is parseable to an int.
+
+    See Also
+    --------
+    zeros, ones_like
+
+    Examples
+    --------
+    >>> ak.ones(5, dtype=ak.int64)
+    array([1, 1, 1, 1, 1])
+
+    >>> ak.ones(5, dtype=ak.float64)
+    array([1, 1, 1, 1, 1])
+
+    >>> ak.ones(5, dtype=ak.bool)
+    array([True, True, True, True, True])
+    """
+    if not np.isscalar(size):
+        raise TypeError("size must be a scalar, not {}". \
+                        format(size.__class__.__name__))
+    dtype = akdtype(dtype)  # normalize dtype
+    # check dtype for error
+    if cast(np.dtype, dtype).name not in NumericDTypes:
+        raise TypeError("unsupported dtype {}".format(dtype))
+    repMsg = generic_msg(cmd="create", args="{} {}".format(
+        cast(np.dtype, dtype).name, size))
+    a = create_pdarray(repMsg)
+    a.fill(1)
+    return a
+
+
+@typechecked
+def zeros_like(pda: pdarray) -> pdarray:
+    """
+    Create a zero-filled pdarray of the same size and dtype as an existing
+    pdarray.
+
+    Parameters
+    ----------
+    pda : pdarray
+        Array to use for size and dtype
+
+    Returns
+    -------
+    pdarray
+        Equivalent to ak.zeros(pda.size, pda.dtype)
+
+    Raises
+    ------
+    TypeError
+        Raised if the pda parameter is not a pdarray.
+
+    See Also
+    --------
+    zeros, ones_like
+
+    Examples
+    --------
+    >>> zeros = ak.zeros(5, dtype=ak.int64)
+    >>> ak.zeros_like(zeros)
+    array([0, 0, 0, 0, 0])
+
+    >>> zeros = ak.zeros(5, dtype=ak.float64)
+    >>> ak.zeros_like(zeros)
+    array([0, 0, 0, 0, 0])
+
+    >>> zeros = ak.zeros(5, dtype=ak.bool)
+    >>> ak.zeros_like(zeros)
+    array([False, False, False, False, False])
+    """
+    return zeros(pda.size, pda.dtype)
+
+
+@typechecked
+def ones_like(pda: pdarray) -> pdarray:
+    """
+    Create a one-filled pdarray of the same size and dtype as an existing
+    pdarray.
+
+    Parameters
+    ----------
+    pda : pdarray
+        Array to use for size and dtype
+
+    Returns
+    -------
+    pdarray
+        Equivalent to ak.ones(pda.size, pda.dtype)
+
+    Raises
+    ------
+    TypeError
+        Raised if the pda parameter is not a pdarray.
+
+    See Also
+    --------
+    ones, zeros_like
+
+    Notes
+    -----
+    Logic for generating the pdarray is delegated to the ak.ones method.
+    Accordingly, the supported dtypes match are defined by the ak.ones method.
+
+    Examples
+    --------
+    >>> ones = ak.ones(5, dtype=ak.int64)
+     >>> ak.ones_like(ones)
+    array([1, 1, 1, 1, 1])
+
+    >>> ones = ak.ones(5, dtype=ak.float64)
+    >>> ak.ones_like(ones)
+    array([1, 1, 1, 1, 1])
+
+    >>> ones = ak.ones(5, dtype=ak.bool)
+    >>> ak.ones_like(ones)
+    array([True, True, True, True, True])
+    """
+    return ones(pda.size, pda.dtype)
+
+
+def arange(*args) -> pdarray:
+    """
+    arange([start,] stop[, stride])
+
+    Create a pdarray of consecutive integers within the interval [start, stop).
+    If only one arg is given then arg is the stop parameter. If two args are
+    given, then the first arg is start and second is stop. If three args are
+    given, then the first arg is start, second is stop, third is stride.
+
+    Parameters
+    ----------
+    start : int_scalars, optional
+        Starting value (inclusive)
+    stop : int_scalars
+        Stopping value (exclusive)
+    stride : int_scalars, optional
+        The difference between consecutive elements, the default stride is 1,
+        if stride is specified then start must also be specified.
+
+    Returns
+    -------
+    pdarray, int64
+        Integers from start (inclusive) to stop (exclusive) by stride
+
+    Raises
+    ------
+    TypeError
+        Raised if start, stop, or stride is not an int object
+    ZeroDivisionError
+        Raised if stride == 0
+
+    See Also
+    --------
+    linspace, zeros, ones, randint
+
+    Notes
+    -----
+    Negative strides result in decreasing values. Currently, only int64
+    pdarrays can be created with this method. For float64 arrays, use
+    the linspace method.
+
+    Examples
+    --------
+    >>> ak.arange(0, 5, 1)
+    array([0, 1, 2, 3, 4])
+
+    >>> ak.arange(5, 0, -1)
+    array([5, 4, 3, 2, 1])
+
+    >>> ak.arange(0, 10, 2)
+    array([0, 2, 4, 6, 8])
+
+    >>> ak.arange(-5, -10, -1)
+    array([-5, -6, -7, -8, -9])
+    """
+
+    # if one arg is given then arg is stop
+    if len(args) == 1:
+        start = 0
+        stop = args[0]
+        stride = 1
+
+    # if two args are given then first arg is start and second is stop
+    if len(args) == 2:
+        start = args[0]
+        stop = args[1]
+        stride = 1
+
+    # if three args are given then first arg is start,
+    # second is stop, third is stride
+    if len(args) == 3:
+        start = args[0]
+        stop = args[1]
+        stride = args[2]
+
+    if stride == 0:
+        raise ZeroDivisionError("division by zero")
+
+    if isSupportedInt(start) and isSupportedInt(stop) and isSupportedInt(stride):
+        if stride < 0:
+            stop = stop + 2
+        repMsg = generic_msg(cmd='arange', args="{} {} {}".format(start, stop, stride))
+        return create_pdarray(repMsg)
+    else:
+        raise TypeError("start,stop,stride must be type int or np.int64 {} {} {}". \
+                        format(start, stop, stride))
+
+
+@typechecked
+def linspace(start: numeric_scalars,
+             stop: numeric_scalars, length: int_scalars) -> pdarray:
+    """
+    Create a pdarray of linearly-spaced floats in a closed interval.
+
+    Parameters
+    ----------
+    start : numeric_scalars
+        Start of interval (inclusive)
+    stop : numeric_scalars
+        End of interval (inclusive)
+    length : int_scalars
+        Number of points
+
+    Returns
+    -------
+    pdarray, float64
+        Array of evenly spaced float values along the interval
+
+    Raises
+    ------
+    TypeError
+        Raised if start or stop is not a float or int or if length is not an int
+
+    See Also
+    --------
+    arange
+
+    Notes
+    -----
+    If that start is greater than stop, the pdarray values are generated
+    in descending order.
+
+    Examples
+    --------
+    >>> ak.linspace(0, 1, 5)
+    array([0, 0.25, 0.5, 0.75, 1])
+
+    >>> ak.linspace(start=1, stop=0, length=5)
+    array([1, 0.75, 0.5, 0.25, 0])
+
+    >>> ak.linspace(start=-5, stop=0, length=5)
+    array([-5, -3.75, -2.5, -1.25, 0])
+    """
+    if not isSupportedNumber(start) or not isSupportedNumber(stop):
+        raise TypeError('both start and stop must be an int, np.int64, float, or np.float64')
+    if not isSupportedNumber(length):
+        raise TypeError('length must be an int or int64')
+    repMsg = generic_msg(cmd='linspace', args="{} {} {}".format(start, stop, length))
+    return create_pdarray(repMsg)
+
+
+@typechecked
+def randint(low: numeric_scalars, high: numeric_scalars,
+            size: int_scalars, dtype=int64, seed: int_scalars = None) -> pdarray:
+    """
+    Generate a pdarray of randomized int, float, or bool values in a
+    specified range bounded by the low and high parameters.
+
+    Parameters
+    ----------
+    low : numeric_scalars
+        The low value (inclusive) of the range
+    high : numeric_scalars
+        The high value (exclusive for int, inclusive for float) of the range
+    size : int_scalars
+        The length of the returned array
+    dtype : Union[int64, float64, bool]
+        The dtype of the array
+    seed : int_scalars
+        Index for where to pull the first returned value
+
+
+    Returns
+    -------
+    pdarray
+        Values drawn uniformly from the specified range having the desired dtype
+
+    Raises
+    ------
+    TypeError
+        Raised if dtype.name not in DTypes, size is not an int, low or high is
+        not an int or float, or seed is not an int
+    ValueError
+        Raised if size < 0 or if high < low
+
+    Notes
+    -----
+    Calling randint with dtype=float64 will result in uniform non-integral
+    floating point values.
+
+    Examples
+    --------
+    >>> ak.randint(0, 10, 5)
+    array([5, 7, 4, 8, 3])
+
+    >>> ak.randint(0, 1, 3, dtype=ak.float64)
+    array([0.92176432277231968, 0.083130710959903542, 0.68894208386667544])
+
+    >>> ak.randint(0, 1, 5, dtype=ak.bool)
+    array([True, False, True, True, True])
+
+    >>> ak.randint(1, 5, 10, seed=2)
+    array([4, 3, 1, 3, 4, 4, 2, 4, 3, 2])
+
+    >>> ak.randint(1, 5, 3, dtype=ak.float64, seed=2)
+    array([2.9160772326374946, 4.353429832157099, 4.5392023718621486])
+
+    >>> ak.randint(1, 5, 10, dtype=ak.bool, seed=2)
+    array([False, True, True, True, True, False, True, True, True, True])
+    """
+    if size < 0 or high < low:
+        raise ValueError("size must be > 0 and high > low")
+    dtype = akdtype(dtype)  # normalize dtype
+    # check dtype for error
+    if dtype.name not in DTypes:
+        raise TypeError("unsupported dtype {}".format(dtype))
+    lowstr = NUMBER_FORMAT_STRINGS[dtype.name].format(low)
+    highstr = NUMBER_FORMAT_STRINGS[dtype.name].format(high)
+    sizestr = NUMBER_FORMAT_STRINGS['int64'].format(size)
+
+    arr = pdarray(cmd='randint', cmd_args='{} {} {} {} {}'. \
+                  format(sizestr, dtype.name, lowstr, highstr, seed),
+                  mydtype=dtype.name, size=size, ndim=1, shape=[size], itemsize=dtype.itemsize)
+
+    generic_msg(cmd='randint', args='{} {} {} {} {}'. \
+                format(sizestr, dtype.name, lowstr, highstr, seed),
+                create_pdarray=True, buff_emptying=False, arr_id=arr.name)
+
+    return arr
+
+
+@typechecked
+def uniform(size: int_scalars, low: numeric_scalars = float(0.0),
+            high: numeric_scalars = 1.0, seed: Union[None,
+                                                     int_scalars] = None) -> pdarray:
+    """
+    Generate a pdarray with uniformly distributed random float values
+    in a specified range.
+
+    Parameters
+    ----------
+    low : float_scalars
+        The low value (inclusive) of the range, defaults to 0.0
+    high : float_scalars
+        The high value (inclusive) of the range, defaults to 1.0
+    size : int_scalars
+        The length of the returned array
+    seed : int_scalars, optional
+        Value used to initialize the random number generator
+
+    Returns
+    -------
+    pdarray, float64
+        Values drawn uniformly from the specified range
+
+    Raises
+    ------
+    TypeError
+        Raised if dtype.name not in DTypes, size is not an int, or if
+        either low or high is not an int or float
+    ValueError
+        Raised if size < 0 or if high < low
+
+    Notes
+    -----
+    The logic for uniform is delegated to the ak.randint method which
+    is invoked with a dtype of float64
+
+    Examples
+    --------
+    >>> ak.uniform(3)
+    array([0.92176432277231968, 0.083130710959903542, 0.68894208386667544])
+
+    >>> ak.uniform(size=3,low=0,high=5,seed=0)
+    array([0.30013431967121934, 0.47383036230759112, 1.0441791878997098])
+    """
+    return randint(low=low, high=high, size=size, dtype='float64', seed=seed)
+
+
+@typechecked
+def standard_normal(size: int_scalars, seed: Union[None, int_scalars] = None) -> pdarray:
+    """
+    Draw real numbers from the standard normal distribution.
+
+    Parameters
+    ----------
+    size : int_scalars
+        The number of samples to draw (size of the returned array)
+    seed : int_scalars
+        Value used to initialize the random number generator
+
+    Returns
+    -------
+    pdarray, float64
+        The array of random numbers
+
+    Raises
+    ------
+    TypeError
+        Raised if size is not an int
+    ValueError
+        Raised if size < 0
+
+    See Also
+    --------
+    randint
+
+    Notes
+    -----
+    For random samples from :math:`N(\\mu, \\sigma^2)`, use:
+
+    ``(sigma * standard_normal(size)) + mu``
+
+    Examples
+    --------
+    >>> ak.standard_normal(3,1)
+    array([-0.68586185091150265, 1.1723810583573375, 0.567584107142031])
+    """
+    if size < 0:
+        raise ValueError("The size parameter must be > 0")
+    return create_pdarray(generic_msg(cmd='randomNormal', args='{} {}'. \
+                                      format(NUMBER_FORMAT_STRINGS['int64'].format(size), seed)))
+
+
+@typechecked
+def random_strings_uniform(minlen: int_scalars, maxlen: int_scalars,
+                           size: int_scalars, characters: str = 'uppercase',
+                           seed: Union[None, int_scalars] = None) -> Strings:
+    """
+    Generate random strings with lengths uniformly distributed between
+    minlen and maxlen, and with characters drawn from a specified set.
+
+    Parameters
+    ----------
+    minlen : int_scalars
+        The minimum allowed length of string
+    maxlen : int_scalars
+        The maximum allowed length of string
+    size : int_scalars
+        The number of strings to generate
+    characters : (uppercase, lowercase, numeric, printable, binary)
+        The set of characters to draw from
+    seed :  Union[None, int_scalars], optional
+        Value used to initialize the random number generator
+
+    Returns
+    -------
+    Strings
+        The array of random strings
 
     Raises
     ------
     ValueError
-        if the url does not match one of the above formats, if the port is not an
-        integer, or if there's a general string parse error raised in the parsing
-        of the url parameter
+        Raised if minlen < 0, maxlen < minlen, or size < 0
+
+    See Also
+    --------
+    random_strings_lognormal, randint
+
+    Examples
+    --------
+    >>> ak.random_strings_uniform(minlen=1, maxlen=5, seed=1, size=5)
+    array(['TVKJ', 'EWAB', 'CO', 'HFMD', 'U'])
+
+    >>> ak.random_strings_uniform(minlen=1, maxlen=5, seed=1, size=5,
+    ... characters='printable')
+    array(['+5"f', '-P]3', '4k', '~HFF', 'F'])
     """
-    try:
-        # split on tcp:// and if missing or malformmed, raise ValueError
-        no_protocol_stub = url.split('tcp://')
-        if len(no_protocol_stub) < 2:
-            raise ValueError(('url must be in form tcp://<hostname/url>:<port>' +
-                              ' or tcp://<hostname/url>:<port>?token=<token>'))
+    if minlen < 0 or maxlen < minlen or size < 0:
+        raise ValueError(("Incompatible arguments: minlen < 0, maxlen " +
+                          "< minlen, or size < 0"))
 
-        # split on : to separate host from port or port?token=<token>
-        host_stub = no_protocol_stub[1].split(':')
-        if len(host_stub) < 2:
-            raise ValueError(('url must be in form tcp://<hostname/url>:<port>' +
-                              ' or tcp://<hostname/url>:<port>?token=<token>'))
-        host = host_stub[0]
-        port_stub = host_stub[1]
-
-        if '?token=' in port_stub:
-            port_token_stub = port_stub.split('?token=')
-            return (host, int(port_token_stub[0]), port_token_stub[1])
-        else:
-            return (host, int(port_stub), None)
-    except Exception as e:
-        raise ValueError(e)
+    repMsg = generic_msg(cmd="randomStrings", args="{} {} {} {} {} {}". \
+                         format(NUMBER_FORMAT_STRINGS['int64'].format(size),
+                                "uniform", characters,
+                                NUMBER_FORMAT_STRINGS['int64'].format(minlen),
+                                NUMBER_FORMAT_STRINGS['int64'].format(maxlen),
+                                seed))
+    return Strings(*(cast(str, repMsg).split('+')))
 
 
-def _set_access_token(access_token: Optional[str],
-                      connect_string: str = 'localhost:5555') -> Optional[str]:
+@typechecked
+def random_strings_lognormal(logmean: numeric_scalars, logstd: numeric_scalars,
+                             size: int_scalars, characters: str = 'uppercase',
+                             seed: Optional[int_scalars] = None) -> Strings:
     """
-    Sets the access_token for the connect request by doing the following:
-
-    1. retrieves the token configured for the connect_string from the
-       .arkouda/tokens.txt file, if any
-    2. if access_token is None, returns the retrieved token
-    3. if access_token is not None, replaces retrieved token with the access_token
-       to account for situations where the token can change for a url (for example,
-       the arkouda_server is restarted and a corresponding new token is generated).
+    Generate random strings with log-normally distributed lengths and
+    with characters drawn from a specified set.
 
     Parameters
     ----------
-    username : str
-        The username retrieved from the user's home directory
-    access_token : str
-        The access_token supplied by the user, which is required if authentication
-        is enabled, defaults to None
-    connect_string : str
-        The arkouda_server host:port connect string, defaults to localhost:5555
+    logmean : numeric_scalars
+        The log-mean of the length distribution
+    logstd :  numeric_scalars
+        The log-standard-deviation of the length distribution
+    size : int_scalars
+        The number of strings to generate
+    characters : (uppercase, lowercase, numeric, printable, binary)
+        The set of characters to draw from
+    seed : int_scalars, optional
+        Value used to initialize the random number generator
 
     Returns
     -------
-    str
-        The access token configured for the host:port, None if there is no
-        token configured for the host:port
+    Strings
+        The Strings object encapsulating a pdarray of random strings
 
     Raises
     ------
-    IOError
-        If there's an error writing host:port -> access_token mapping to
-        the user's tokens.txt file or retrieving the user's tokens
-    """
-    path = '{}/tokens.txt'.format(security.get_arkouda_client_directory())
-    try:
-        tokens = io_util.delimited_file_to_dict(path)
-    except Exception as e:
-        raise IOError(e)
-
-    if cast(str, access_token) and cast(str, access_token) not in {'', 'None'}:
-        saved_token = tokens.get(connect_string)
-        if saved_token is None or saved_token != access_token:
-            tokens[connect_string] = cast(str, access_token)
-            try:
-                io_util.dict_to_delimited_file(values=tokens, path=path,
-                                               delimiter=',')
-            except Exception as e:
-                raise IOError(e)
-        return access_token
-    else:
-        try:
-            tokens = io_util.delimited_file_to_dict(path)
-        except Exception as e:
-            raise IOError(e)
-        return tokens.get(connect_string)
-
-
-def _start_tunnel(addr: str, tunnel_server: str) -> Tuple[str, object]:
-    """
-    Starts ssh tunnel
-
-    Parameters
-    ----------
-    tunnel_server : str
-        The ssh server url
-
-    Returns
-    -------
-    str
-        The new tunneled-version of connect string
-    object
-        The ssh tunnel object
-
-    Raises
-    ------
-    ConnectionError
-        If the ssh tunnel could not be created given the tunnel_server
-        url and credentials (either password or key file)
-    """
-    from zmq import ssh
-    kwargs = {'addr': addr,
-              'server': tunnel_server}
-    keyfile = os.getenv('ARKOUDA_KEY_FILE')
-    password = os.getenv('ARKOUDA_PASSWORD')
-
-    if keyfile:
-        kwargs['keyfile'] = keyfile
-    if password:
-        kwargs['password'] = password
-
-    try:
-        return ssh.tunnel.open_tunnel(**kwargs)
-    except Exception as e:
-        raise ConnectionError(e)
-
-
-def _send_string_message(cmd: str, recv_bytes: bool = False,
-                         args: str = None) -> Union[str, bytes]:
-    """
-    Generates a RequestMessage encapsulating command and requesting
-    user information, sends it to the Arkouda server, and returns
-    either a string or binary depending upon the message format.
-
-    Parameters
-    ----------
-    cmd : str
-        The name of the command to be executed by the Arkouda server
-    recv_bytes : bool, defaults to False
-        A boolean indicating whether the return message will be in bytes
-        as opposed to a string
-    args : str
-        A delimited string containing 1..n command arguments
-
-    Returns
-    -------
-    Union[str,bytes]
-        The response string or byte array sent back from the Arkouda server
-
-    Raises
-    ------
-    RuntimeError
-        Raised if the return message contains the word "Error", indicating
-        a server-side error was thrown
+    TypeError
+        Raised if logmean is neither a float nor a int, logstd is not a float,
+        size is not an int, or if characters is not a str
     ValueError
-        Raised if the return message is malformed JSON or is missing 1..n
-        expected fields
+        Raised if logstd <= 0 or size < 0
+
+    See Also
+    --------
+    random_strings_lognormal, randint
+
+    Notes
+    -----
+    The lengths of the generated strings are distributed $Lognormal(\\mu, \\sigma^2)$,
+    with :math:`\\mu = logmean` and :math:`\\sigma = logstd`. Thus, the strings will
+    have an average length of :math:`exp(\\mu + 0.5*\\sigma^2)`, a minimum length of
+    zero, and a heavy tail towards longer strings.
+
+    Examples
+    --------
+    >>> ak.random_strings_lognormal(2, 0.25, 5, seed=1)
+    array(['TVKJTE', 'ABOCORHFM', 'LUDMMGTB', 'KWOQNPHZ', 'VSXRRL'])
+
+    >>> ak.random_strings_lognormal(2, 0.25, 5, seed=1, characters='printable')
+    array(['+5"fp-', ']3Q4kC~HF', '=F=`,IE!', 'DjkBa'9(', '5oZ1)='])
     """
-    message = RequestMessage(user=username, token=token, cmd=cmd,
-                             format=MessageFormat.STRING, args=cast(str, args))
+    if not isSupportedNumber(logmean) or not isSupportedNumber(logstd):
+        raise TypeError('both logmean and logstd must be an int, np.int64, float, or np.float64')
+    if logstd <= 0 or size < 0:
+        raise ValueError("Incompatible arguments: logstd <= 0 or size < 0")
 
-    logger.debug('sending message {}'.format(message))
-
-    socket.send_string(json.dumps(message.asdict()))
-
-    if recv_bytes:
-        return_message = socket.recv()
-
-        # raise errors or warnings sent back from the server
-        if return_message.startswith(b"Error:"):
-            raise RuntimeError(return_message.decode())
-        elif return_message.startswith(b"Warning:"):
-            warnings.warn(return_message.decode())
-        return return_message
-    else:
-        raw_message = socket.recv_string()
-        try:
-            return_message = ReplyMessage.fromdict(json.loads(raw_message))
-
-            # raise errors or warnings sent back from the server
-            if return_message.msgType == MessageType.ERROR:
-                raise RuntimeError(return_message.msg)
-            elif return_message.msgType == MessageType.WARNING:
-                warnings.warn(return_message.msg)
-            return return_message.msg
-        except KeyError as ke:
-            raise ValueError('Return message is missing the {} field'.format(ke))
-        except json.decoder.JSONDecodeError:
-            raise ValueError('Return message is not valid JSON: {}'. \
-                             format(raw_message))
-
-
-def _send_binary_message(cmd: str, payload: bytes, recv_bytes: bool = False,
-                         args: str = None) -> Union[str, bytes]:
-    """
-    Generates a RequestMessage encapsulating command and requesting user information,
-    information prepends the binary payload, sends the binary request to the Arkouda
-    server, and returns either a string or binary depending upon the message format.
-
-    Parameters
-    ----------
-    cmd : str
-        The name of the command to be executed by the Arkouda server
-    payload : bytes
-        The bytes to be converted to a pdarray, Strings, or Categorical object
-        on the Arkouda server
-    recv_bytes : bool, defaults to False
-        A boolean indicating whether the return message will be in bytes
-        as opposed to a string
-    args : str
-        A delimited string containing 1..n command arguments
-
-    Returns
-    -------
-    Union[str,bytes]
-        The response string or byte array sent back from the Arkouda server
-
-    Raises
-    ------
-    RuntimeError
-        Raised if the return message contains the word "Error", indicating
-        a server-side error was thrown
-    ValueError
-        Raised if the return message is malformed JSON or is missing 1..n
-        expected fields
-    """
-    message = RequestMessage(user=username, token=token, cmd=cmd,
-                             format=MessageFormat.BINARY, args=cast(str, args))
-
-    logger.debug('sending message {}'.format(message))
-
-    socket.send('{}BINARY_PAYLOAD'. \
-                format(json.dumps(message.asdict())).encode() + payload)
-
-    if recv_bytes:
-        binary_return_message = cast(bytes, socket.recv())
-        # raise errors or warnings sent back from the server
-        if binary_return_message.startswith(b"Error:"): \
-                raise RuntimeError(binary_return_message.decode())
-        elif binary_return_message.startswith(b"Warning:"): \
-                warnings.warn(binary_return_message.decode())
-        return binary_return_message
-    else:
-        raw_message = socket.recv_string()
-        try:
-            return_message = ReplyMessage.fromdict(json.loads(raw_message))
-
-            # raise errors or warnings sent back from the server
-            if return_message.msgType == MessageType.ERROR:
-                raise RuntimeError(return_message.msg)
-            elif return_message.msgType == MessageType.WARNING:
-                warnings.warn(return_message.msg)
-            return return_message.msg
-        except KeyError as ke:
-            raise ValueError('Return message is missing the {} field'.format(ke))
-        except json.decoder.JSONDecodeError:
-            raise ValueError('{} is not valid JSON, may be server-side error'. \
-                             format(raw_message))
-
-
-# message arkouda server the client is disconnecting from the server
-def disconnect() -> None:
-    """
-    Disconnects the client from the Arkouda server
-
-    Returns
-    -------
-    None
-
-    Raises
-    ------
-    ConnectionError
-        Raised if there's an error disconnecting from the Arkouda server
-    """
-    global socket, pspStr, connected, verbose, token
-
-    if connected:
-        # send disconnect message to server
-        message = "disconnect"
-        logger.debug("[Python] Sending request: {}".format(message))
-        return_message = cast(str, _send_string_message(message))
-        logger.debug("[Python] Received response: {}".format(return_message))
-        try:
-            socket.disconnect(pspStr)
-        except Exception as e:
-            raise ConnectionError(e)
-        connected = False
-        clientLogger.info(return_message)
-    else:
-        clientLogger.info("not connected; cannot disconnect")
-
-
-def shutdown() -> None:
-    """
-    Sends a shutdown message to the Arkouda server that does the
-    following:
-
-    1. Delete all objects in the SymTable
-    2. Shuts down the Arkouda server
-    3. Disconnects the client from the stopped Arkouda Server
-
-    Returns
-    -------
-    None
-
-    Raises
-    ------
-    RuntimeError
-        Raised if the client is not connected to the Arkouda server or
-        there is an error in disconnecting from the server
-    """
-    global socket, pspStr, connected, verbose
-
-    if not connected:
-        raise RuntimeError('not connected, cannot shutdown server')
-    # send shutdown message to server
-    message = "shutdown"
-
-    logger.debug("[Python] Sending request: {}".format(message))
-    return_message = cast(str, _send_string_message(message))
-    logger.debug("[Python] Received response: {}".format(return_message))
-
-    try:
-        socket.disconnect(pspStr)
-    except Exception as e:
-        raise RuntimeError(e)
-    connected = False
-
-
-def generic_msg(cmd: str, args: Union[str, bytes] = None, send_bytes: bool = False,
-                recv_bytes: bool = False, return_value_needed: bool = False,
-                create_pdarray: bool = False, buff_emptying: bool = False, arr_id: str = None) -> Union[str, bytes]:
-    """
-    Sends the binary or string message to the arkouda_server and returns
-    the response sent by the server which is either a success confirmation
-    or error message
-
-    Parameters
-    ----------
-    message : Union[str, bytes]
-        The message to be sent in the form of a string or bytes array
-    send_bytes : bool
-        Indicates if the message to be sent is binary, defaults to False
-    recv_bypes : bool
-        Indicates if the return message will be binary, default to False
-
-    Returns
-    -------
-    Union[str, bytes]
-        The string or binary return message
-
-    Raises
-    ------
-    KeyboardInterrupt
-        Raised if the user interrupts during command execution
-    RuntimeError
-        Raised if the client is not connected to the server or if
-        there is a server-side error thrown
-    """
-    global socket, pspStr, connected, verbose
-
-    if not connected:
-        raise RuntimeError("client is not connected to a server")
-
-    if return_value_needed and not q.empty() and not buff_emptying:
-        buff_empty()
-
-    if return_value_needed or buff_emptying:
-        try:
-            # Send the message
-            if send_bytes:
-                repMsg = _send_binary_message(cmd=cmd,
-                                              payload=cast(bytes, args),
-                                              recv_bytes=recv_bytes)
-            else:
-                repMsg = _send_string_message(cmd=cmd,
-                                              args=cast(str, args),
-                                              recv_bytes=recv_bytes)
-
-            if create_pdarray:
-                fields = repMsg.split()
-                name = fields[1]
-                mydtype = fields[2]
-                size = int(fields[3])
-                ndim = int(fields[4])
-                shape = [int(el) for el in fields[5][1:-1].split(',')]
-                itemsize = int(fields[6])
-                logger.debug(("created Chapel array with name: {} dtype: {} size: {} ndim: {} shape: {} " +
-                              "itemsize: {}").format(name, mydtype, size, ndim, shape, itemsize))
-                client_to_server_names[arr_id] = name
-            return repMsg
-
-        except KeyboardInterrupt as e:
-            # if the user interrupts during command execution, the socket gets out
-            # of sync reset the socket before raising the interrupt exception
-            socket = context.socket(zmq.REQ)
-            socket.connect(pspStr)
-            raise e
-    else:
-        if send_bytes:
-            buff_item = BufferItem(cmd=cmd,
-                                   args=cast(bytes, args),
-                                   send_bytes=send_bytes,
-                                   recv_bytes=recv_bytes,
-                                   create_pdarray=create_pdarray,
-                                   pdarray_id=arr_id)
-        else:
-            buff_item = BufferItem(cmd=cmd,
-                                   args=cast(str, args),
-                                   send_bytes=send_bytes,
-                                   recv_bytes=recv_bytes,
-                                   create_pdarray=create_pdarray,
-                                   pdarray_id=arr_id)
-        buff_push(buff_item)
-    return
-
-
-def get_config() -> Mapping[str, Union[str, int, float]]:
-    """
-    Get runtime information about the server.
-
-    Returns
-    -------
-    Mapping[str, Union[str, int, float]]
-        serverHostname
-        serverPort
-        numLocales
-        numPUs (number of processor units per locale)
-        maxTaskPar (maximum number of tasks per locale)
-        physicalMemory
-
-    Raises
-    ------
-    RuntimeError
-        Raised if there is a server-side error in getting memory used
-    ValueError
-        Raised if there's an error in parsing the JSON-formatted server config
-    """
-    try:
-        raw_message = cast(str, generic_msg(cmd="getconfig", return_value_needed=True))
-        return json.loads(raw_message)
-    except json.decoder.JSONDecodeError:
-        raise ValueError('Returned config is not valid JSON: {}'.format(raw_message))
-    except Exception as e:
-        raise RuntimeError('{} in retrieving Arkouda server config'.format(e))
-
-
-def get_mem_used() -> int:
-    """
-    Compute the amount of memory used by objects in the server's symbol table.
-
-    Returns
-    -------
-    int
-        Indicates the amount of memory allocated to symbol table objects.
-
-    Raises
-    ------
-    RuntimeError
-        Raised if there is a server-side error in getting memory used
-    ValueError
-        Raised if the returned value is not an int-formatted string
-    """
-    mem_used_message = cast(str, generic_msg(cmd="getmemused"))
-    return int(mem_used_message)
-
-
-def _no_op() -> str:
-    """
-    Send a no-op message just to gather round trip time
-
-    Returns
-    -------
-    str
-        The noop command result
-
-    Raises
-    ------
-    RuntimeError
-        Raised if there is a server-side error in executing noop request
-    """
-    return cast(str, generic_msg("noop"))
-
-
-def ruok() -> str:
-    """
-    Simply sends an "ruok" message to the server and, if the return message is
-    "imok", this means the arkouda_server is up and operating normally. A return
-    message of "imnotok" indicates an error occurred or the connection timed out.
-
-    This method is basically a way to do a quick healthcheck in a way that does
-    not require error handling.
-
-    Returns
-    -------
-    str
-        A string indicating if the server is operating normally (imok), if there's
-        an error server-side, or if ruok did not return a response (imnotok) in
-        both of the latter cases
-    """
-    try:
-        res = cast(str, generic_msg('ruok'))
-        if res == 'imok':
-            return 'imok'
-        else:
-            return 'imnotok because: {}'.format(res)
-    except Exception as e:
-        return 'ruok did not return response: {}'.format(str(e))
-
-
-class BufferItem:
-    def __init__(self, cmd : str, args : Union[str,bytes]=None, send_bytes : bool=False,
-                recv_bytes : bool=False, create_pdarray: bool=False, pdarray_id: str=None):
-        self.cmd = cmd
-        self.args = args
-        self.send_bytes = send_bytes
-        self.recv_bytes = recv_bytes
-        self.create_pdarray = create_pdarray
-        self.pdarray_id = pdarray_id
-
-    def execute(self):
-        print("[Executing]")
-        print(self.cmd)
-        print(self.args)
-        generic_msg(self.cmd, self.args, self.send_bytes, self.recv_bytes,
-                    return_value_needed=True, create_pdarray=self.create_pdarray,
-                    buff_emptying=True, arr_id=self.pdarray_id)
-        print("[Executing]")
-
-
-def buff_push(item: BufferItem):
-    q.put(item)
-    if q.full():
-        buff_empty()
-
-
-def buff_empty():
-    q.get().execute()
-    if not q.empty():
-        buff_empty()
+    repMsg = generic_msg(cmd="randomStrings", args="{} {} {} {} {} {}". \
+                         format(NUMBER_FORMAT_STRINGS['int64'].format(size),
+                                "lognormal", characters,
+                                NUMBER_FORMAT_STRINGS['float64'].format(logmean),
+                                NUMBER_FORMAT_STRINGS['float64'].format(logstd),
+                                seed))
+    return Strings(*(cast(str, repMsg).split('+')))

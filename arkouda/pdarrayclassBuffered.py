@@ -1,26 +1,32 @@
 from __future__ import annotations
-from typing import cast, Sequence, Union
+from typing import cast, Sequence, Union, List
 from typeguard import typechecked
 import json, struct
 import numpy as np  # type: ignore
-from arkouda.client import *
+from arkouda.client import generic_msg, RegisteredSymbols, EmptyRegistry
 from arkouda.dtypes import dtype, DTypes, resolve_scalar_dtype, \
     structDtypeCodes, translate_np_dtype, NUMBER_FORMAT_STRINGS, \
-    int_scalars, numeric_scalars, numpy_scalars
+    int_scalars, numeric_scalars, numpy_scalars, int64
 from arkouda.dtypes import int64 as akint64
 from arkouda.dtypes import str_ as akstr_
 from arkouda.dtypes import bool as npbool
 from arkouda.logger import getArkoudaLogger
+from collections import defaultdict
 import builtins
 
-__all__ = ["pdarray", "info", "clear", "any", "all", "is_sorted", "sum", "prod",
+__all__ = ["pdarray", "info", "clear", "any", "all", "is_sorted", "list_registry", "sum", "prod",
            "min", "max", "argmin", "argmax", "mean", "var", "std", "mink",
-           "maxk", "argmink", "argmaxk", "register_pdarray", "attach_pdarray",
-           "unregister_pdarray"]
+           "maxk", "argmink", "argmaxk", "attach_pdarray",
+           "unregister_pdarray", "RegistrationError", "multAndStore"]
 
 logger = getArkoudaLogger(name='pdarrayclass')
 
 array_count = 1
+
+# Default dictionary so you can access cached pdarrays as
+# cache[type of stored value][size of pdarray]
+cache = dict()
+cache[int64] = defaultdict(list)
 
 
 @typechecked
@@ -121,11 +127,13 @@ class pdarray:
         self.itemsize = itemsize
 
     def __del__(self):
-        try:
-            logger.debug('deleting pdarray with name {}'.format(self.name))
-            generic_msg(cmd='delete', args='{}'.format(self.name))
-        except:
-            pass
+        # try:
+        logger.debug('deleting pdarray with name {}'.format(self.name))
+        print("Caching ", self.name)
+        cache_array(self)
+
+    # except:
+    #     pass
 
     def __bool__(self) -> builtins.bool:
         if self.size != 1:
@@ -286,6 +294,13 @@ class pdarray:
 
     # overload * for pdarray, other can be {pdarray, int, float}
     def __mul__(self, other):
+        print("Checking array")
+        # print(self.dtype)
+        # print(self.size)
+        # print(check_arr(self.dtype, self.size))
+        if check_arr(self.dtype, self.size):
+            print("Calling mult and store")
+            return multAndStore(self, other, uncache_array(self.dtype, self.size))
         return self._binop(other, "*")
 
     def __rmul__(self, other):
@@ -551,6 +566,26 @@ class pdarray:
         Return True iff all elements of the array evaluate to True.
         """
         return all(self)
+
+    def is_registered(self) -> np.bool_:
+        """
+        Return True iff the object is contained in the registry
+
+        Parameters
+        ----------
+        None
+
+        Returns
+        -------
+        bool
+            Indicates if the object is contained in the registry
+
+        Raises
+        ------
+        RuntimeError
+            Raised if there's a server-side error thrown
+        """
+        return np.bool_(self.name in list_registry())
 
     def is_sorted(self) -> np.bool_:
         """
@@ -961,10 +996,14 @@ class pdarray:
         return cast(str, generic_msg(cmd="tohdf", args="{} {} {} {} {}". \
                                      format(self.name, dataset, m, json_array, self.dtype)))
 
+    @typechecked
     def register(self, user_defined_name: str) -> pdarray:
         """
-        Return a pdarray with a user defined name in the arkouda server
+        Register this pdarray with a user defined name in the arkouda server
         so it can be attached to later using pdarray.attach()
+        This is an in-place operation, registering a pdarray more than once will
+        update the name in the registry and remove the previously registered name.
+        A name can only be registered to one pdarray at a time.
 
         Parameters
         ----------
@@ -974,14 +1013,18 @@ class pdarray:
         Returns
         -------
         pdarray
-            pdarray which points to original input pdarray but is also
-            registered with user defined name in the arkouda server
+            The same pdarray which is now registered with the arkouda server and has an updated name.
+            This is an in-place modification, the original is returned to support a fluid programming style.
+            Please note you cannot register two different pdarrays with the same name.
 
         Raises
         ------
         TypeError
-            Raised if pda is neither a pdarray nor a str or if
-            user_defined_name is not a str
+            Raised if user_defined_name is not a str
+        RegistrationError
+            If the server was unable to register the pdarray with the user_defined_name
+            If the user is attempting to register more than one pdarray with the same name, the former should be
+            unregistered first to free up the registration name.
 
         See also
         --------
@@ -995,13 +1038,23 @@ class pdarray:
         Examples
         --------
         >>> a = zeros(100)
-        >>> r_pda = a.register("my_zeros")
+        >>> a.register("my_zeros")
         >>> # potentially disconnect from server and reconnect to server
         >>> b = ak.pdarray.attach("my_zeros")
         >>> # ...other work...
         >>> b.unregister()
         """
-        return register_pdarray(self, user_defined_name)
+        try:
+            rep_msg = generic_msg(cmd="register", args=f"{self.name} {user_defined_name}")
+            if isinstance(rep_msg, bytes):
+                rep_msg = str(rep_msg, "UTF-8")
+            if rep_msg != "success":
+                raise RegistrationError
+        except (RuntimeError, RegistrationError):  # Registering two objects with the same name is not allowed
+            raise RegistrationError(f"Server was unable to register {user_defined_name}")
+
+        self.name = user_defined_name
+        return self
 
     def unregister(self) -> None:
         """
@@ -1010,8 +1063,6 @@ class pdarray:
 
         Parameters
         ----------
-        user_defined_name : str
-            which array was registered under
 
         Returns
         -------
@@ -1019,8 +1070,8 @@ class pdarray:
 
         Raises
         ------
-        TypeError
-            Raised if pda is neither a pdarray nor a str
+        RuntimeError
+            Raised if the server could not find the internal name/symbol to remove
 
         See also
         --------
@@ -1034,7 +1085,7 @@ class pdarray:
         Examples
         --------
         >>> a = zeros(100)
-        >>> r_pda = a.register("my_zeros")
+        >>> a.register("my_zeros")
         >>> # potentially disconnect from server and reconnect to server
         >>> b = ak.pdarray.attach("my_zeros")
         >>> # ...other work...
@@ -1045,9 +1096,10 @@ class pdarray:
     # class method self is not passed in
     # invoke with ak.pdarray.attach('user_defined_name')
     @staticmethod
+    @typechecked
     def attach(user_defined_name: str) -> pdarray:
         """
-        class method to return a pdarray attached to the a registered name in the arkouda
+        class method to return a pdarray attached to the registered name in the arkouda
         server which was registered using register()
 
         Parameters
@@ -1058,8 +1110,7 @@ class pdarray:
         Returns
         -------
         pdarray
-            pdarray which points to pdarray registered with user defined
-            name in the arkouda server
+            pdarray which is bound to corresponding server side component that was registered with user_defined_name
 
         Raises
         ------
@@ -1078,7 +1129,7 @@ class pdarray:
         Examples
         --------
         >>> a = zeros(100)
-        >>> r_pda = a.register("my_zeros")
+        >>> a.register("my_zeros")
         >>> # potentially disconnect from server and reconnect to server
         >>> b = ak.pdarray.attach("my_zeros")
         >>> # ...other work...
@@ -1165,6 +1216,36 @@ def info(pda: Union[pdarray, str]) -> str:
     else:
         raise TypeError("info: must be pdarray or string".format(pda))
         return generic_msg(cmd="info", args="{}".format(pda))
+
+
+def list_registry() -> List[str]:
+    """
+    Return a list containing the names of all registered objects
+
+    Parameters
+    ----------
+    None
+
+    Returns
+    -------
+    list
+        List of all object names in the registry
+
+    Raises
+    ------
+    RuntimeError
+        Raised if there's a server-side error thrown
+    """
+    registered_list: List[str] = []
+
+    if info(RegisteredSymbols) != EmptyRegistry:
+        registered_object: str
+        for registered_object in filter(None, info(RegisteredSymbols).split('\n')):
+            if registered_object is not None:
+                name = registered_object.split()[0].split(':')[1].replace('"', '')
+                registered_list.append(name)
+
+    return registered_list
 
 
 def clear() -> None:
@@ -1764,66 +1845,10 @@ def argmaxk(pda: pdarray, k: int_scalars) -> pdarray:
 
 
 @typechecked
-def register_pdarray(pda: Union[str, pdarray], user_defined_name: str) -> pdarray:
-    """
-    Return a pdarray with a user defined name in the arkouda server
-    so it can be attached to later using attach_pdarray()
-
-    Parameters
-    ----------
-    pda : str or pdarray
-        the array to register
-    user_defined_name : str
-        user defined name array is to be registered under
-
-    Returns
-    -------
-    pdarray
-        pdarray which points to original input pdarray but is also
-        registered with user defined name in the arkouda server
-
-
-    Raises
-    ------
-    TypeError
-        Raised if pda is neither a pdarray nor a str or if
-        user_defined_name is not a str
-
-    See also
-    --------
-    attach_pdarray, unregister_pdarray
-
-    Notes
-    -----
-    Registered names/pdarrays in the server are immune to deletion
-    until they are unregistered.
-
-    Examples
-    --------
-    >>> a = zeros(100)
-    >>> r_pda = ak.register_pda(a, "my_zeros")
-    >>> # potentially disconnect from server and reconnect to server
-    >>> b = ak.attach_pda("my_zeros")
-    >>> # ...other work...
-    >>> ak.unregister_pda(b)
-    """
-
-    if isinstance(pda, pdarray):
-        repMsg = generic_msg(cmd="register", args="{} {}". \
-                             format(pda.name, user_defined_name))
-        return create_pdarray(repMsg)
-
-    if isinstance(pda, str):
-        repMsg = generic_msg(cmd="register", args="{} {}". \
-                             format(pda, user_defined_name))
-        return create_pdarray(repMsg)
-
-
-@typechecked
 def attach_pdarray(user_defined_name: str) -> pdarray:
     """
-    Return a pdarray attached to the a registered name in the arkouda
-    server which was registered using register_pdarray()
+    class method to return a pdarray attached to the registered name in the arkouda
+    server which was registered using register()
 
     Parameters
     ----------
@@ -1833,17 +1858,16 @@ def attach_pdarray(user_defined_name: str) -> pdarray:
     Returns
     -------
     pdarray
-        pdarray which points to pdarray registered with user defined
-        name in the arkouda server
+        pdarray which is bound to corresponding server side component that was registered with user_defined_name
 
     Raises
     ------
     TypeError
-        Raised if user_defined_name is not a str
+      Raised if user_defined_name is not a str
 
     See also
     --------
-    register_pdarray, unregister_pdarray
+    register, unregister_pdarray
 
     Notes
     -----
@@ -1853,7 +1877,7 @@ def attach_pdarray(user_defined_name: str) -> pdarray:
     Examples
     --------
     >>> a = zeros(100)
-    >>> r_pda = ak.register_pdarray(a, "my_zeros")
+    >>> a.register("my_zeros")
     >>> # potentially disconnect from server and reconnect to server
     >>> b = ak.attach_pdarray("my_zeros")
     >>> # ...other work...
@@ -1867,12 +1891,10 @@ def attach_pdarray(user_defined_name: str) -> pdarray:
 def unregister_pdarray(pda: Union[str, pdarray]) -> None:
     """
     Unregister a pdarray in the arkouda server which was previously
-    registered using register_pdarray() and/or attached to using attach_pdarray()
+    registered using register() and/or attahced to using attach_pdarray()
 
     Parameters
     ----------
-    pda : str or pdarray
-        user define name which array was registered under
 
     Returns
     -------
@@ -1880,12 +1902,12 @@ def unregister_pdarray(pda: Union[str, pdarray]) -> None:
 
     Raises
     ------
-    TypeError
-        Raised if pda is neither a pdarray nor a str
+    RuntimeError
+        Raised if the server could not find the internal name/symbol to remove
 
     See also
     --------
-    register_pdarray, unregister_pdarray
+    register, unregister_pdarray
 
     Notes
     -----
@@ -1895,7 +1917,7 @@ def unregister_pdarray(pda: Union[str, pdarray]) -> None:
     Examples
     --------
     >>> a = zeros(100)
-    >>> r_pda = ak.register_pdarray(a, "my_zeros")
+    >>> a.register("my_zeros")
     >>> # potentially disconnect from server and reconnect to server
     >>> b = ak.attach_pdarray("my_zeros")
     >>> # ...other work...
@@ -1906,3 +1928,34 @@ def unregister_pdarray(pda: Union[str, pdarray]) -> None:
 
     if isinstance(pda, str):
         repMsg = generic_msg(cmd="unregister", args="{}".format(pda))
+
+
+@typechecked
+def multAndStore(pda_left: pdarray, pda_right: pdarray, pda_store: pdarray) -> pdarray:
+    cmd = "binopvvStore"
+    args = "{} {} {} {}". \
+        format("*", pda_left.name, pda_right.name, pda_store.name)
+    repMsg = generic_msg(cmd=cmd, args=args)
+    return pda_store
+
+
+# TODO In the future move this to a specific errors file
+class RegistrationError(Exception):
+    """Error/Exception used when the Arkouda Server cannot register an object"""
+
+
+def cache_array(arr: pdarray):
+    cache[arr.dtype][arr.size].append(arr)
+
+
+def check_arr(dtype, arr_size):
+    # Make sure cache[dtype][arr_size] is not empty
+    return dtype in cache and arr_size in cache[dtype] and cache[dtype][arr_size]
+
+
+def uncache_array(dtype, arr_size):
+    if check_arr(dtype, arr_size):
+        arr = cache[dtype][arr_size].pop()
+        print("Uncaching ", arr.name)
+        print("New cache length ", len(cache[dtype][arr_size]))
+        return arr
