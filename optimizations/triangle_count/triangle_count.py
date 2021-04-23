@@ -2,7 +2,8 @@ import arkouda as ak
 import numpy as np
 import time
 
-def triangle_count_numpy(L:np.ndarray, nblocks_m, nblocks_n, nblocks_l, verbose):
+
+def triangle_count_numpy(L: np.ndarray, nblocks_m, nblocks_n, nblocks_l, verbose):
     """
     Implements the triangle count algorithm
     for numpy arrays.
@@ -32,7 +33,7 @@ def triangle_count_numpy(L:np.ndarray, nblocks_m, nblocks_n, nblocks_l, verbose)
     return s
 
 
-def create_blocks_numpy(A:np.ndarray, row_size, col_size):
+def create_blocks_numpy(A: np.ndarray, row_size, col_size):
     num_rows = A.shape[0] // row_size
     num_cols = A.shape[0] // col_size
     out = []
@@ -42,13 +43,13 @@ def create_blocks_numpy(A:np.ndarray, row_size, col_size):
             M = np.zeros((row_size, col_size))
             for i in range(row_size):
                 for j in range(col_size):
-                    M[i][j] = A[r*row_size + i][c*col_size + j]
+                    M[i][j] = A[r * row_size + i][c * col_size + j]
             out.append(M)
 
     return out
 
 
-def triangle_count_scalar(L:np.ndarray, nblocks_m, nblocks_n, nblocks_l):
+def triangle_count_scalar(L: np.ndarray, nblocks_m, nblocks_n, nblocks_l):
     dim = L.shape[0]
     bm = (dim + nblocks_m - 1) // nblocks_m
     bn = (dim + nblocks_n - 1) // nblocks_n
@@ -58,18 +59,29 @@ def triangle_count_scalar(L:np.ndarray, nblocks_m, nblocks_n, nblocks_l):
     bB = create_blocks_scalar(L, bl, bn)
     bM = create_blocks_scalar(L, bm, bn)
 
-    mxm_result = ak.zeros(1, dtype=np.int64)
-    mxm_mask_result = ak.zeros(1, dtype=np.int64)
+    # mxm_result = ak.zeros(1, dtype=np.int64)
+    # mxm_mask_result = ak.zeros(1, dtype=np.int64)
 
     s = 0
     for i in range(nblocks_m):
         for j in range(nblocks_n):
             for k in range(nblocks_l):
-                ak.multAndStore(bA[i * nblocks_l + k], bB[k * nblocks_n + j], mxm_result)
-                ak.multAndStore(mxm_result, bM[i * nblocks_n + j], mxm_mask_result)
-                # mxm_result = bA[i * nblocks_l + k] * bB[k * nblocks_n + j]
-                # mxm_mask_result = mxm_result * bM[i * nblocks_n + j]
+                # ak.multAndStore(bA[i * nblocks_l + k], bB[k * nblocks_n + j], mxm_result)
+                # ak.multAndStore(mxm_result, bM[i * nblocks_n + j], mxm_mask_result)
+
+                # print("\n*** mxm_result line *** ")
+                mxm_result = bA[i * nblocks_l + k] * bB[k * nblocks_n + j]
+                # print("mxm_result id is", mxm_result.name)
+                # print("*** mxm_result line ***\n")
+                # print("\n*** mxm_mask_result line *** ")
+                mxm_mask_result = mxm_result * bM[i * nblocks_n + j]
+                # print("mxm_mask_result id is", mxm_mask_result.name)
+                # print("*** mxm_mask_result line ***\n")
                 s += ak.sum(mxm_mask_result)
+
+                # mxm_result.__del__()
+                # mxm_mask_result.__del__()
+
                 # s += ak.sum((bA[i * nblocks_l + k] * bB[k * nblocks_n + j]) * bM[i * nblocks_n + j])
 
     return s
@@ -98,5 +110,5 @@ start = time.perf_counter()
 print(triangle_count_scalar(x, 2, 2, 2))
 end = time.perf_counter()
 print(f"triangle count took {end - start:0.9f} seconds")
-ak.disconnect()
-# ak.shutdown()
+# ak.disconnect()
+ak.shutdown()
