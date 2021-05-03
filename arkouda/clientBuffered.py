@@ -558,11 +558,31 @@ def generic_msg(cmd: str, args: Union[str, bytes] = None, send_bytes: bool = Fal
     if not connected:
         raise RuntimeError("client is not connected to a server")
 
+    if send_bytes:
+            buff_item = BufferItem(cmd=cmd,
+                                   args=cast(bytes, args),
+                                   send_bytes=send_bytes,
+                                   recv_bytes=recv_bytes,
+                                   create_pdarray=create_pdarray,
+                                   pdarray_id=arr_id)
+    else:
+        buff_item = BufferItem(cmd=cmd,
+                                args=cast(str, args),
+                                send_bytes=send_bytes,
+                                recv_bytes=recv_bytes,
+                                create_pdarray=create_pdarray,
+                                pdarray_id=arr_id)
+
+
     if return_value_needed and not q.empty() and not buff_emptying:
-        buff_empty()
+        #buff_empty()
+        buff_push(buff_item)
+        execute_with_dependencies(buff_item)
 
     if return_value_needed or buff_emptying:
         try:
+            # Transform the args
+            args=transform_args(args)
             # Send the message
             if send_bytes:
                 repMsg = _send_binary_message(cmd=cmd,
@@ -583,6 +603,7 @@ def generic_msg(cmd: str, args: Union[str, bytes] = None, send_bytes: bool = Fal
                 itemsize = int(fields[6])
                 logger.debug(("created Chapel array with name: {} dtype: {} size: {} ndim: {} shape: {} " +
                               "itemsize: {}").format(name, mydtype, size, ndim, shape, itemsize))
+                print(arr_id,' and ',name)
                 client_to_server_names[arr_id] = name
             return repMsg
 
@@ -593,20 +614,6 @@ def generic_msg(cmd: str, args: Union[str, bytes] = None, send_bytes: bool = Fal
             socket.connect(pspStr)
             raise e
     else:
-        if send_bytes:
-            buff_item = BufferItem(cmd=cmd,
-                                   args=cast(bytes, args),
-                                   send_bytes=send_bytes,
-                                   recv_bytes=recv_bytes,
-                                   create_pdarray=create_pdarray,
-                                   pdarray_id=arr_id)
-        else:
-            buff_item = BufferItem(cmd=cmd,
-                                   args=cast(str, args),
-                                   send_bytes=send_bytes,
-                                   recv_bytes=recv_bytes,
-                                   create_pdarray=create_pdarray,
-                                   pdarray_id=arr_id)
         buff_push(buff_item)
     return
 
@@ -713,25 +720,85 @@ class BufferItem:
         self.recv_bytes = recv_bytes
         self.create_pdarray = create_pdarray
         self.pdarray_id = pdarray_id
+        self.dependencies = []
 
     def __str__(self):
         return "Buffer Item, Cmd={0}, Args={1}, Pdarray_id={2}".format(self.cmd, self.args, self.pdarray_id)
 
     def execute(self):
-        print("[Executing]")
-        print(self)
         generic_msg(self.cmd, self.args, self.send_bytes, self.recv_bytes,
                     return_value_needed=True, create_pdarray=self.create_pdarray,
                     buff_emptying=True, arr_id=self.pdarray_id)
 
-
 def buff_push(item: BufferItem):
+    #transform_args(item)
     q.put(item)
-    print("[Pushing]")
-    print(item)
-    print("New Queue Size is:", q.qsize())
+    make_dependencies(item)
     if q.full():
         buff_empty_partial(q.maxsize - 1)
+
+def is_temporary(arg: str):
+    if (arg[:2]=="id"):
+        return True
+    else:
+        return False
+
+def make_dependencies(item: BufferItem):
+    #print('starting length of dependencies:',len(item.dependencies))
+    args_list = list()
+    args_list = item.args.split(" ")
+    args_list=args_list[1:]
+    if (item.cmd=="binopvvStore"): #exclude the variable that we store into
+        args_list=args_list[:-1]
+    args_list=list(filter(is_temporary,args_list))
+    #print("args_list=",args_list)
+    for q_elem in reversed(list(q.queue)):
+        if (q_elem is item):
+            continue
+        args_list_q_elem=list()
+        if (q_elem.pdarray_id==None):
+            if (q_elem.cmd=='binopvvStore'):
+                args_list_q_elem.append(q_elem.args[-1])
+        else:
+            args_list_q_elem.append(q_elem.pdarray_id)
+        args_list_q_elem=list(filter(is_temporary,args_list_q_elem))
+        for arg_q_elem in args_list_q_elem:
+            if (arg_q_elem in args_list and not(q_elem in item.dependencies)):
+                item.dependencies.append(q_elem)
+                args_list.remove(arg_q_elem)
+
+def remove_from_queue(item: BufferItem):
+    top = None
+    helper_queue = Queue(5)
+    while (not q.empty() and top!=item):
+        top=q.get()
+        if (top!=item):
+            helper_queue.put(top)
+    while (not helper_queue.empty()):
+        q.put(helper_queue.get())
+
+def transform_args(args: str):
+    if (args==None):
+        return None
+    args_list = list()
+    args_list = args.split(" ")
+    for i in range(len(args_list)):
+        if (args_list[i] in client_to_server_names.keys()):
+            args_list[i]=client_to_server_names[args_list[i]]
+    s=""
+    for i in range(len(args_list)):
+        if (i<len(args_list)-1):
+            s+=args_list[i]+" "
+        else:
+            s+=args_list[i]
+    return s
+
+def execute_with_dependencies(item: BufferItem):
+    #print("[Executing with depedencies]:",item)
+    for dependency in item.dependencies:
+        execute_with_dependencies(dependency)
+    item.execute()
+    remove_from_queue(item)
 
 
 def buff_empty():
@@ -745,4 +812,3 @@ def buff_empty():
 def buff_empty_partial(size):
     while q.qsize() > size:
         q.get().execute()
-    print("New Queue Size is:", q.qsize())
