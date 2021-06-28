@@ -1,0 +1,1 @@
+2021-06-21:22:03:10 [arkouda_server] main Line 288 INFO [Chapel] <<< shutdown initiated by andrej took 0.00011400000000083566 sec, time spent creating stuff 737.67700000000002 sec

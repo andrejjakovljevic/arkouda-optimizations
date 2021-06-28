@@ -105,10 +105,10 @@ x = np.array([[0, 0, 0, 0],
               [1, 1, 0, 0],
               [0, 1, 1, 0]])
 
-ak.connect(connect_url='tcp://MacBook-Pro.local:5555')
+ak.connect(connect_url='tcp://andrej-X556UQ:5555')
 start = time.perf_counter()
 print(triangle_count_scalar(x, 2, 2, 2))
 end = time.perf_counter()
 print(f"triangle count took {end - start:0.9f} seconds")
-# ak.disconnect()
+ak.disconnect()
 ak.shutdown()

@@ -5,7 +5,7 @@ This is the main driver for the arkouda server */
 use FileIO;
 use Security;
 use ServerConfig;
-use Time only;
+use Time;
 use ZMQ only;
 use Memory;
 use FileSystem;
@@ -69,7 +69,7 @@ proc main() {
                                                                  ServerPort, token);
         }
         
-        serverMessage = adjustMsg(serverMessage);      
+        serverMessage = adjustMsg(serverMessage);      var t1 = new Time.Timer();
         serverMessage = "%s %s %s".format(buff,serverMessage,buff);
         
         var vBuff = generateBuffer(serverMessage,verMessage);
@@ -278,8 +278,8 @@ proc main() {
                 shutdown(user=user);
                 if (trace) {
                     asLogger.info(getModuleName(),getRoutineName(),getLineNumber(),
-                                         "<<< shutdown initiated by %s took %.17r sec".format(user, 
-                                                   t1.elapsed() - s0));
+                                         "<<< shutdown initiated by %s took %.17r sec, time spent creating stuff %.17r ms".format(user, 
+                                                   t1.elapsed() - s0, watch.elapsed(TimeUnits.milliseconds)));
                 }
                 break;
             }
@@ -435,6 +435,8 @@ proc main() {
                                                                                  t1.elapsed() - s0));
             }
         }
+        //st.pretty();
+        stdout.flush();
     }
 
     t1.stop();
@@ -443,7 +445,7 @@ proc main() {
 
     asLogger.info(getModuleName(), getRoutineName(), getLineNumber(),
                "requests = %i responseCount = %i elapsed sec = %i".format(reqCount,repCount,
-                                                                                 t1.elapsed()));
+                                                                                 t1.elapsed(TimeUnits.milliseconds)));
 }
 
 /*

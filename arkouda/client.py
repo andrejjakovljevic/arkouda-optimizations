@@ -6,7 +6,8 @@ import pyfiglet # type: ignore
 from arkouda import security, io_util, __version__
 from arkouda.logger import getArkoudaLogger
 from arkouda.message import RequestMessage, MessageFormat, ReplyMessage, \
-     MessageType
+    MessageType
+from queue import Queue
 
 __all__ = ["connect", "disconnect", "shutdown", "get_config", "get_mem_used", "ruok"]
 
@@ -23,35 +24,42 @@ verboseDefVal = False
 verbose = verboseDefVal
 # threshold for __iter__() to limit comms to arkouda_server
 pdarrayIterThreshDefVal = 100
-pdarrayIterThresh  = pdarrayIterThreshDefVal
-maxTransferBytesDefVal = 2**30
+pdarrayIterThresh = pdarrayIterThreshDefVal
+maxTransferBytesDefVal = 2 ** 30
 maxTransferBytes = maxTransferBytesDefVal
 
-logger = getArkoudaLogger(name='Arkouda Client') 
-clientLogger = getArkoudaLogger(name='Arkouda User Logger', logFormat='%(message)s')   
+logger = getArkoudaLogger(name='Arkouda Client')
+clientLogger = getArkoudaLogger(name='Arkouda User Logger', logFormat='%(message)s')
 
 # Print splash message
 print('{}'.format(pyfiglet.figlet_format('Arkouda')))
 print('Client Version: {}'.format(__version__)) # type: ignore
 
+queue_size : int = 10
+
+q = Queue(queue_size)
+client_to_server_names = {}
+
+
 # reset settings to default values
 def set_defaults() -> None:
     """
-    Sets client variables including verbose, maxTransferBytes and 
+    Sets client variables including verbose, maxTransferBytes and
     pdarrayIterThresh to default values.
-    
+
     Returns
     -------
     None
     """
     global verbose, maxTransferBytes, pdarrayIterThresh
     verbose = verboseDefVal
-    pdarrayIterThresh  = pdarrayIterThreshDefVal
+    pdarrayIterThresh = pdarrayIterThreshDefVal
     maxTransferBytes = maxTransferBytesDefVal
 
+
 # create context, request end of socket, and connect to it
-def connect(server : str="localhost", port : int=5555, timeout : int=0, 
-                           access_token : str=None, connect_url=None) -> None:
+def connect(server: str = "localhost", port: int = 5555, timeout: int = 0,
+            access_token: str = None, connect_url=None) -> None:
     """
     Connect to a running arkouda server.
 
@@ -66,7 +74,7 @@ def connect(server : str="localhost", port : int=5555, timeout : int=0,
         The timeout in seconds for client send and receive operations.
         Defaults to 0 seconds, whicn is interpreted as no timeout.
     access_token : str, optional
-        The token used to connect to an existing socket to enable access to 
+        The token used to connect to an existing socket to enable access to
         an Arkouda server where authentication is enabled. Defaults to None.
     connect_url : str, optional
         The complete url in the format of tcp://server:port?token=<token_value>
@@ -75,10 +83,10 @@ def connect(server : str="localhost", port : int=5555, timeout : int=0,
     Returns
     -------
     None
-    
+
     Raises
     ------
-    ConnectionError 
+    ConnectionError
         Raised if there's an error in connecting to the Arkouda server
     ValueError
         Raised if there's an error in parsing the connect_url parameter
@@ -99,29 +107,29 @@ def connect(server : str="localhost", port : int=5555, timeout : int=0,
         server = url_values[0]
         port = url_values[1]
         if len(url_values) == 3:
-            access_token=url_values[2]
-    
+            access_token = url_values[2]
+
     # "protocol://server:port"
-    pspStr = "tcp://{}:{}".format(server,port)
-    
+    pspStr = "tcp://{}:{}".format(server, port)
+
     # check to see if tunnelled connection is desired. If so, start tunnel
     tunnel_server = os.getenv('ARKOUDA_TUNNEL_SERVER')
     if tunnel_server:
         (pspStr, _) = _start_tunnel(addr=pspStr, tunnel_server=tunnel_server)
-    
+
     logger.debug("psp = {}".format(pspStr))
 
     # create and configure socket for connections to arkouda server
-    socket = context.socket(zmq.REQ) # request end of the zmq connection
+    socket = context.socket(zmq.REQ)  # request end of the zmq connection
 
     # if timeout is specified, set send and receive timeout params
     if timeout > 0:
-        socket.setsockopt(zmq.SNDTIMEO, timeout*1000)
-        socket.setsockopt(zmq.RCVTIMEO, timeout*1000)
-    
+        socket.setsockopt(zmq.SNDTIMEO, timeout * 1000)
+        socket.setsockopt(zmq.RCVTIMEO, timeout * 1000)
+
     # set token and username global variables
     username = security.get_username()
-    token = cast(str, _set_access_token(access_token=access_token, 
+    token = cast(str, _set_access_token(access_token=access_token,
                                         connect_string=pspStr))
 
     # connect to arkouda server
@@ -143,12 +151,13 @@ def connect(server : str="localhost", port : int=5555, timeout : int=0,
     conf = get_config()
     if conf['arkoudaVersion'] != __version__:
         warnings.warn(('Version mismatch between client ({}) and server ({}); ' +
-                      'this may cause some commands to fail or behave ' +
-                      'incorrectly! Updating arkouda is strongly recommended.').\
+                       'this may cause some commands to fail or behave ' +
+                       'incorrectly! Updating arkouda is strongly recommended.'). \
                       format(__version__, conf['arkoudaVersion']), RuntimeWarning)
     clientLogger.info(return_message)
 
-def _parse_url(url : str) -> Tuple[str,int,Optional[str]]:
+
+def _parse_url(url: str) -> Tuple[str, int, Optional[str]]:
     """
     Parses the url in the following format if authentication enabled:
 
@@ -157,23 +166,23 @@ def _parse_url(url : str) -> Tuple[str,int,Optional[str]]:
     If authentication is not enabled, the url is expected to be in the format:
 
     tcp://<hostname/url>:<port>
-    
+
     Parameters
     ----------
     url : str
-        The url string    
-    
+        The url string
+
     Returns
     -------
     Tuple[str,int,Optional[str]]
-        A tuple containing the host, port, and token, the latter of which is None 
+        A tuple containing the host, port, and token, the latter of which is None
         if authentication is not enabled for the Arkouda server being accessed
-    
+
     Raises
     ------
-    ValueError 
-        if the url does not match one of the above formats, if the port is not an 
-        integer, or if there's a general string parse error raised in the parsing 
+    ValueError
+        if the url does not match one of the above formats, if the port is not an
+        integer, or if there's a general string parse error raised in the parsing
         of the url parameter
     """
     try:
@@ -181,16 +190,16 @@ def _parse_url(url : str) -> Tuple[str,int,Optional[str]]:
         no_protocol_stub = url.split('tcp://')
         if len(no_protocol_stub) < 2:
             raise ValueError(('url must be in form tcp://<hostname/url>:<port>' +
-                  ' or tcp://<hostname/url>:<port>?token=<token>'))
+                              ' or tcp://<hostname/url>:<port>?token=<token>'))
 
         # split on : to separate host from port or port?token=<token>
         host_stub = no_protocol_stub[1].split(':')
         if len(host_stub) < 2:
             raise ValueError(('url must be in form tcp://<hostname/url>:<port>' +
-                  ' or tcp://<hostname/url>:<port>?token=<token>'))
+                              ' or tcp://<hostname/url>:<port>?token=<token>'))
         host = host_stub[0]
         port_stub = host_stub[1]
-   
+
         if '?token=' in port_stub:
             port_token_stub = port_stub.split('?token=')
             return (host, int(port_token_stub[0]), port_token_stub[1])
@@ -199,12 +208,13 @@ def _parse_url(url : str) -> Tuple[str,int,Optional[str]]:
     except Exception as e:
         raise ValueError(e)
 
-def _set_access_token(access_token : Optional[str], 
-                                connect_string : str='localhost:5555') -> Optional[str]:
+
+def _set_access_token(access_token: Optional[str],
+                      connect_string: str = 'localhost:5555') -> Optional[str]:
     """
     Sets the access_token for the connect request by doing the following:
 
-    1. retrieves the token configured for the connect_string from the 
+    1. retrieves the token configured for the connect_string from the
        .arkouda/tokens.txt file, if any
     2. if access_token is None, returns the retrieved token
     3. if access_token is not None, replaces retrieved token with the access_token
@@ -214,19 +224,19 @@ def _set_access_token(access_token : Optional[str],
     Parameters
     ----------
     username : str
-        The username retrieved from the user's home directory    
+        The username retrieved from the user's home directory
     access_token : str
         The access_token supplied by the user, which is required if authentication
         is enabled, defaults to None
     connect_string : str
         The arkouda_server host:port connect string, defaults to localhost:5555
-    
+
     Returns
     -------
     str
         The access token configured for the host:port, None if there is no
         token configured for the host:port
-    
+
     Raises
     ------
     IOError
@@ -239,16 +249,16 @@ def _set_access_token(access_token : Optional[str],
     except Exception as e:
         raise IOError(e)
 
-    if cast(str,access_token) and cast(str,access_token) not in {'','None'}:
+    if cast(str, access_token) and cast(str, access_token) not in {'', 'None'}:
         saved_token = tokens.get(connect_string)
         if saved_token is None or saved_token != access_token:
-            tokens[connect_string] = cast(str,access_token)
+            tokens[connect_string] = cast(str, access_token)
             try:
-                io_util.dict_to_delimited_file(values=tokens, path=path, 
+                io_util.dict_to_delimited_file(values=tokens, path=path,
                                                delimiter=',')
             except Exception as e:
                 raise IOError(e)
-        return access_token   
+        return access_token
     else:
         try:
             tokens = io_util.delimited_file_to_dict(path)
@@ -256,15 +266,16 @@ def _set_access_token(access_token : Optional[str],
             raise IOError(e)
         return tokens.get(connect_string)
 
-def _start_tunnel(addr : str, tunnel_server : str) -> Tuple[str,object]:
+
+def _start_tunnel(addr: str, tunnel_server: str) -> Tuple[str, object]:
     """
     Starts ssh tunnel
 
     Parameters
     ----------
     tunnel_server : str
-        The ssh server url   
-    
+        The ssh server url
+
     Returns
     -------
     str
@@ -274,13 +285,13 @@ def _start_tunnel(addr : str, tunnel_server : str) -> Tuple[str,object]:
 
     Raises
     ------
-    ConnectionError 
-        If the ssh tunnel could not be created given the tunnel_server 
+    ConnectionError
+        If the ssh tunnel could not be created given the tunnel_server
         url and credentials (either password or key file)
     """
     from zmq import ssh
-    kwargs = {'addr' : addr,
-              'server' : tunnel_server}
+    kwargs = {'addr': addr,
+              'server': tunnel_server}
     keyfile = os.getenv('ARKOUDA_KEY_FILE')
     password = os.getenv('ARKOUDA_PASSWORD')
 
@@ -289,16 +300,17 @@ def _start_tunnel(addr : str, tunnel_server : str) -> Tuple[str,object]:
     if password:
         kwargs['password'] = password
 
-    try: 
+    try:
         return ssh.tunnel.open_tunnel(**kwargs)
     except Exception as e:
         raise ConnectionError(e)
 
-def _send_string_message(cmd : str, recv_bytes : bool=False, 
-                                   args : str=None) -> Union[str, bytes]:
+
+def _send_string_message(cmd: str, recv_bytes: bool = False,
+                         args: str = None) -> Union[str, bytes]:
     """
     Generates a RequestMessage encapsulating command and requesting
-    user information, sends it to the Arkouda server, and returns 
+    user information, sends it to the Arkouda server, and returns
     either a string or binary depending upon the message format.
 
     Parameters
@@ -315,18 +327,18 @@ def _send_string_message(cmd : str, recv_bytes : bool=False,
     -------
     Union[str,bytes]
         The response string or byte array sent back from the Arkouda server
-        
+
     Raises
     ------
     RuntimeError
-        Raised if the return message contains the word "Error", indicating 
+        Raised if the return message contains the word "Error", indicating
         a server-side error was thrown
     ValueError
         Raised if the return message is malformed JSON or is missing 1..n
-        expected fields       
+        expected fields
     """
-    message = RequestMessage(user=username, token=token, cmd=cmd, 
-                          format=MessageFormat.STRING, args=cast(str,args))
+    message = RequestMessage(user=username, token=token, cmd=cmd,
+                             format=MessageFormat.STRING, args=cast(str, args))
 
     logger.debug('sending message {}'.format(message))
 
@@ -336,9 +348,9 @@ def _send_string_message(cmd : str, recv_bytes : bool=False,
         return_message = socket.recv()
 
         # raise errors or warnings sent back from the server
-        if return_message.startswith(b"Error:"): 
+        if return_message.startswith(b"Error:"):
             raise RuntimeError(return_message.decode())
-        elif return_message.startswith(b"Warning:"): 
+        elif return_message.startswith(b"Warning:"):
             warnings.warn(return_message.decode())
         return return_message
     else:
@@ -355,20 +367,21 @@ def _send_string_message(cmd : str, recv_bytes : bool=False,
         except KeyError as ke:
             raise ValueError('Return message is missing the {} field'.format(ke))
         except json.decoder.JSONDecodeError:
-            raise ValueError('Return message is not valid JSON: {}'.\
+            raise ValueError('Return message is not valid JSON: {}'. \
                              format(raw_message))
 
-def _send_binary_message(cmd : str, payload : bytes, recv_bytes : bool=False,
-                                            args : str=None) -> Union[str, bytes]:
+
+def _send_binary_message(cmd: str, payload: bytes, recv_bytes: bool = False,
+                         args: str = None) -> Union[str, bytes]:
     """
     Generates a RequestMessage encapsulating command and requesting user information,
-    information prepends the binary payload, sends the binary request to the Arkouda 
+    information prepends the binary payload, sends the binary request to the Arkouda
     server, and returns either a string or binary depending upon the message format.
 
     Parameters
     ----------
     cmd : str
-        The name of the command to be executed by the Arkouda server    
+        The name of the command to be executed by the Arkouda server
     payload : bytes
         The bytes to be converted to a pdarray, Strings, or Categorical object
         on the Arkouda server
@@ -386,27 +399,27 @@ def _send_binary_message(cmd : str, payload : bytes, recv_bytes : bool=False,
     Raises
     ------
     RuntimeError
-        Raised if the return message contains the word "Error", indicating 
+        Raised if the return message contains the word "Error", indicating
         a server-side error was thrown
     ValueError
         Raised if the return message is malformed JSON or is missing 1..n
         expected fields
     """
-    message = RequestMessage(user=username, token=token, cmd=cmd, 
-                                format=MessageFormat.BINARY, args=cast(str,args))
+    message = RequestMessage(user=username, token=token, cmd=cmd,
+                             format=MessageFormat.BINARY, args=cast(str, args))
 
     logger.debug('sending message {}'.format(message))
 
-    socket.send('{}BINARY_PAYLOAD'.\
+    socket.send('{}BINARY_PAYLOAD'. \
                 format(json.dumps(message.asdict())).encode() + payload)
 
     if recv_bytes:
         binary_return_message = cast(bytes, socket.recv())
         # raise errors or warnings sent back from the server
         if binary_return_message.startswith(b"Error:"): \
-                                   raise RuntimeError(binary_return_message.decode())
+                raise RuntimeError(binary_return_message.decode())
         elif binary_return_message.startswith(b"Warning:"): \
-                                        warnings.warn(binary_return_message.decode())
+                warnings.warn(binary_return_message.decode())
         return binary_return_message
     else:
         raw_message = socket.recv_string()
@@ -422,8 +435,9 @@ def _send_binary_message(cmd : str, payload : bytes, recv_bytes : bool=False,
         except KeyError as ke:
             raise ValueError('Return message is missing the {} field'.format(ke))
         except json.decoder.JSONDecodeError:
-            raise ValueError('{} is not valid JSON, may be server-side error'.\
+            raise ValueError('{} is not valid JSON, may be server-side error'. \
                              format(raw_message))
+
 
 # message arkouda server the client is disconnecting from the server
 def disconnect() -> None:
@@ -433,7 +447,7 @@ def disconnect() -> None:
     Returns
     -------
     None
-    
+
     Raises
     ------
     ConnectionError
@@ -445,7 +459,7 @@ def disconnect() -> None:
         # send disconnect message to server
         message = "disconnect"
         logger.debug("[Python] Sending request: {}".format(message))
-        return_message = cast(str,_send_string_message(message))
+        return_message = cast(str, _send_string_message(message))
         logger.debug("[Python] Received response: {}".format(return_message))
         try:
             socket.disconnect(pspStr)
@@ -455,13 +469,13 @@ def disconnect() -> None:
         clientLogger.info(return_message)
     else:
         clientLogger.info("not connected; cannot disconnect")
-    
+
 
 def shutdown() -> None:
     """
     Sends a shutdown message to the Arkouda server that does the
     following:
-    
+
     1. Delete all objects in the SymTable
     2. Shuts down the Arkouda server
     3. Disconnects the client from the stopped Arkouda Server
@@ -469,7 +483,7 @@ def shutdown() -> None:
     Returns
     -------
     None
-    
+
     Raises
     ------
     RuntimeError
@@ -484,7 +498,7 @@ def shutdown() -> None:
     message = "shutdown"
 
     logger.debug("[Python] Sending request: {}".format(message))
-    return_message = cast(str,_send_string_message(message))
+    return_message = cast(str, _send_string_message(message))
     logger.debug("[Python] Received response: {}".format(return_message))
 
     try:
@@ -493,8 +507,10 @@ def shutdown() -> None:
         raise RuntimeError(e)
     connected = False
 
-def generic_msg(cmd : str, args : Union[str,bytes]=None, send_bytes : bool=False, 
-                recv_bytes : bool=False) -> Union[str, bytes]:
+
+def generic_msg(cmd: str, args: Union[str, bytes] = None, send_bytes: bool = False,
+                recv_bytes: bool = False, return_value_needed: bool = False,
+                create_pdarray: bool = False, buff_emptying: bool = False, arr_id: str = None) -> Union[str, bytes]:
     """
     Sends a binary or string message composed of a command and corresponding 
     arguments to the arkouda_server, returning the response sent by the server.
@@ -515,7 +531,7 @@ def generic_msg(cmd : str, args : Union[str,bytes]=None, send_bytes : bool=False
     -------
     Union[str, bytes]
         The string or binary return message
-    
+
     Raises
     ------
     KeyboardInterrupt
@@ -534,22 +550,66 @@ def generic_msg(cmd : str, args : Union[str,bytes]=None, send_bytes : bool=False
 
     if not connected:
         raise RuntimeError("client is not connected to a server")
-    
-    try:
-        if send_bytes:
-            return _send_binary_message(cmd=cmd, 
-                                            payload=cast(bytes,args), 
-                                            recv_bytes=recv_bytes)         
-        else:
-            return _send_string_message(cmd=cmd, args=cast(str,args), 
-                                            recv_bytes=recv_bytes)
-                
-    except KeyboardInterrupt as e:
-        # if the user interrupts during command execution, the socket gets out 
-        # of sync reset the socket before raising the interrupt exception
-        socket = context.socket(zmq.REQ)
-        socket.connect(pspStr)
-        raise e
+
+    if send_bytes:
+            buff_item = BufferItem(cmd=cmd,
+                                   args=cast(bytes, args),
+                                   send_bytes=send_bytes,
+                                   recv_bytes=recv_bytes,
+                                   create_pdarray=create_pdarray,
+                                   pdarray_id=arr_id)
+    else:
+        buff_item = BufferItem(cmd=cmd,
+                                args=cast(str, args),
+                                send_bytes=send_bytes,
+                                recv_bytes=recv_bytes,
+                                create_pdarray=create_pdarray,
+                                pdarray_id=arr_id)
+
+
+    if return_value_needed and not q.empty() and not buff_emptying:
+        #buff_empty()
+        buff_push(buff_item)
+        execute_with_dependencies(buff_item)
+
+    if return_value_needed or buff_emptying:
+        try:
+            # Transform the args with client to server names
+            args=transform_args(args)
+            # Send the message
+            if send_bytes:
+                repMsg = _send_binary_message(cmd=cmd,
+                                              payload=cast(bytes, args),
+                                              recv_bytes=recv_bytes)
+            else:
+                repMsg = _send_string_message(cmd=cmd,
+                                              args=cast(str, args),
+                                              recv_bytes=recv_bytes)
+
+            if create_pdarray:
+                fields = repMsg.split()
+                name = fields[1]
+                mydtype = fields[2]
+                size = int(fields[3])
+                ndim = int(fields[4])
+                shape = [int(el) for el in fields[5][1:-1].split(',')]
+                itemsize = int(fields[6])
+                logger.debug(("created Chapel array with name: {} dtype: {} size: {} ndim: {} shape: {} " +
+                              "itemsize: {}").format(name, mydtype, size, ndim, shape, itemsize))
+                print(arr_id,' and ',name)
+                client_to_server_names[arr_id] = name
+            return repMsg
+
+        except KeyboardInterrupt as e:
+            # if the user interrupts during command execution, the socket gets out
+            # of sync reset the socket before raising the interrupt exception
+            socket = context.socket(zmq.REQ)
+            socket.connect(pspStr)
+            raise e
+    else:
+        buff_push(buff_item)
+    return
+
 
 def get_config() -> Mapping[str, Union[str, int, float]]:
     """
@@ -564,7 +624,7 @@ def get_config() -> Mapping[str, Union[str, int, float]]:
         numPUs (number of processor units per locale)
         maxTaskPar (maximum number of tasks per locale)
         physicalMemory
-        
+
     Raises
     ------
     RuntimeError
@@ -573,12 +633,13 @@ def get_config() -> Mapping[str, Union[str, int, float]]:
         Raised if there's an error in parsing the JSON-formatted server config
     """
     try:
-        raw_message = cast(str,generic_msg(cmd="getconfig"))
+        raw_message = cast(str, generic_msg(cmd="getconfig", return_value_needed=True))
         return json.loads(raw_message)
     except json.decoder.JSONDecodeError:
         raise ValueError('Returned config is not valid JSON: {}'.format(raw_message))
     except Exception as e:
         raise RuntimeError('{} in retrieving Arkouda server config'.format(e))
+
 
 def get_mem_used() -> int:
     """
@@ -588,16 +649,17 @@ def get_mem_used() -> int:
     -------
     int
         Indicates the amount of memory allocated to symbol table objects.
-    
+
     Raises
-    ------  
+    ------
     RuntimeError
         Raised if there is a server-side error in getting memory used
     ValueError
         Raised if the returned value is not an int-formatted string
     """
-    mem_used_message = cast(str,generic_msg(cmd="getmemused"))
+    mem_used_message = cast(str, generic_msg(cmd="getmemused"))
     return int(mem_used_message)
+
 
 def _no_op() -> str:
     """
@@ -607,9 +669,9 @@ def _no_op() -> str:
     -------
     str
         The noop command result
-        
+
     Raises
-    ------  
+    ------
     RuntimeError
         Raised if there is a server-side error in executing noop request
     """
@@ -620,10 +682,10 @@ def ruok() -> str:
     Simply sends an "ruok" message to the server and, if the return message is
     "imok", this means the arkouda_server is up and operating normally. A return
     message of "imnotok" indicates an error occurred or the connection timed out.
-    
-    This method is basically a way to do a quick healthcheck in a way that does 
+
+    This method is basically a way to do a quick healthcheck in a way that does
     not require error handling.
-    
+
     Returns
     -------
     str
@@ -639,3 +701,108 @@ def ruok() -> str:
             return 'imnotok because: {}'.format(res)
     except Exception as e:
         return 'ruok did not return response: {}'.format(str(e))
+
+
+class BufferItem:
+    def __init__(self, cmd: str, args: Union[str, bytes] = None, send_bytes: bool = False,
+                 recv_bytes: bool = False, create_pdarray: bool = False, pdarray_id: str = None, executed: bool = False):
+        self.cmd = cmd
+        self.args = args
+        self.send_bytes = send_bytes
+        self.recv_bytes = recv_bytes
+        self.create_pdarray = create_pdarray
+        self.pdarray_id = pdarray_id
+        self.dependencies = []
+        self.executed = executed
+
+    def __str__(self):
+        return "Buffer Item, Cmd={0}, Args={1}, Pdarray_id={2}".format(self.cmd, self.args, self.pdarray_id)
+
+    def execute(self):
+        generic_msg(self.cmd, self.args, self.send_bytes, self.recv_bytes,
+                    return_value_needed=True, create_pdarray=self.create_pdarray,
+                    buff_emptying=True, arr_id=self.pdarray_id)
+        self.executed=True
+
+def buff_push(item: BufferItem):
+    #transform_args(item)
+    q.put(item)
+    make_dependencies(item)
+    if q.full():
+        buff_empty_partial(q.maxsize - 1)
+
+def is_temporary(arg: str):
+    if (arg[:2]=="id"):
+        return True
+    else:
+        return False
+
+def make_dependencies(item: BufferItem):
+    #print('starting length of dependencies:',len(item.dependencies))
+    args_list = list()
+    args_list = item.args.split(" ")
+    args_list=args_list[1:]
+    if (item.cmd=="binopvvStore"): #exclude the variable that we store into
+        args_list=args_list[:-1]
+    args_list=list(filter(is_temporary,args_list))
+    #print("args_list=",args_list)
+    for q_elem in reversed(list(q.queue)):
+        if (q_elem is item):
+            continue
+        args_list_q_elem=list()
+        for arg in q_elem.args:
+            args_list_q_elem.append(arg)
+        if (q_elem.pdarray_id!=None):
+            args_list_q_elem.append(q_elem.pdarray_id)
+        args_list_q_elem=list(filter(is_temporary,args_list_q_elem))
+        for arg_q_elem in args_list_q_elem:
+            if (arg_q_elem in args_list and not(q_elem in item.dependencies)):
+                item.dependencies.append(q_elem)
+
+def remove_from_queue(item: BufferItem):
+    top = None
+    helper_queue = Queue(queue_size)
+    while (not q.empty() and top!=item):
+        top=q.get()
+        if (top!=item):
+            helper_queue.put(top)
+    while (not helper_queue.empty()):
+        q.put(helper_queue.get())
+
+def transform_args(args: str):
+    if (args==None):
+        return None
+    args_list = list()
+    args_list = args.split(" ")
+    for i in range(len(args_list)):
+        if (args_list[i] in client_to_server_names.keys()):
+            args_list[i]=client_to_server_names[args_list[i]]
+    s=""
+    for i in range(len(args_list)):
+        if (i<len(args_list)-1):
+            s+=args_list[i]+" "
+        else:
+            s+=args_list[i]
+    return s
+
+def execute_with_dependencies(item: BufferItem):
+    #print("[Executing with depedencies]:",item)
+    if (item.executed):
+        return
+    for dependency in item.dependencies:
+        execute_with_dependencies(dependency)
+    item.execute()
+    remove_from_queue(item)
+
+
+def buff_empty():
+    q.get().execute()
+    if not q.empty():
+        buff_empty()
+    else:
+        print("New Queue Size is:", q.qsize())
+
+
+def buff_empty_partial(size):
+    while q.qsize() > size:
+        q.get().execute()

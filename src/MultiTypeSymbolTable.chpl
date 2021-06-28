@@ -5,7 +5,8 @@ module MultiTypeSymbolTable
     use Reflection;
     use Errors;
     use Logging;
-    
+    use arkouda_server;
+
     use MultiTypeSymEntry;
     use Map;
     use IO;
@@ -96,7 +97,7 @@ module MultiTypeSymbolTable
         proc addEntry(name: string, len: int, type t): borrowed SymEntry(t) throws {
             // check and throw if memory limit would be exceeded
             if t == bool {overMemLimit(len);} else {overMemLimit(len*numBytes(t));}
-            
+            watch.start();
             var entry = new shared SymEntry(len, t);
             if (tab.contains(name)) {
                 mtLogger.debug(getModuleName(),getRoutineName(),getLineNumber(),
@@ -107,6 +108,7 @@ module MultiTypeSymbolTable
             }
 
             tab.addOrSet(name, entry);
+            watch.stop();
             return tab.getBorrowed(name).toSymEntry(t);
         }
 
@@ -124,7 +126,7 @@ module MultiTypeSymbolTable
         proc addEntry(name: string, in entry: shared GenSymEntry): borrowed GenSymEntry throws {
             // check and throw if memory limit would be exceeded
             overMemLimit(entry.size*entry.itemsize);
-
+            watch.start();
             if (tab.contains(name)) {
                 mtLogger.debug(getModuleName(),getRoutineName(),getLineNumber(),
                                                         "redefined symbol: %s ".format(name));
@@ -134,6 +136,8 @@ module MultiTypeSymbolTable
             }
 
             tab.addOrSet(name, entry);
+
+            watch.stop();
             return tab.getBorrowed(name);
         }
 

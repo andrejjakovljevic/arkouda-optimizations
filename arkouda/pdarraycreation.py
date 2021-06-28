@@ -1,32 +1,33 @@
-import numpy as np # type: ignore
-import pandas as pd # type: ignore
+import numpy as np  # type: ignore
+import pandas as pd  # type: ignore
 import struct
 from typing import cast, Iterable, Optional, Union
 from typeguard import typechecked
 from arkouda.client import generic_msg
 from arkouda.dtypes import structDtypeCodes, NUMBER_FORMAT_STRINGS, float64, int64, \
-     DTypes, isSupportedInt, isSupportedNumber, NumericDTypes, SeriesDTypes,\
+    DTypes, isSupportedInt, isSupportedNumber, NumericDTypes, SeriesDTypes, \
     int_scalars, numeric_scalars
 from arkouda.dtypes import dtype as akdtype
-from arkouda.pdarrayclass import pdarray, create_pdarray
+from arkouda.pdarrayclass import pdarray, create_pdarray, check_arr, uncache_array
 from arkouda.strings import Strings
 
-__all__ = ["array", "zeros", "ones", "zeros_like", "ones_like", 
+__all__ = ["array", "zeros", "ones", "zeros_like", "ones_like",
            "arange", "linspace", "randint", "uniform", "standard_normal",
-           "random_strings_uniform", "random_strings_lognormal", 
+           "random_strings_uniform", "random_strings_lognormal",
            "from_series"
-          ]
+           ]
+
 
 @typechecked
-def from_series(series : pd.Series, 
-                    dtype : Optional[Union[type,str]]=None) -> Union[pdarray,Strings]:
+def from_series(series: pd.Series,
+                dtype: Optional[Union[type, str]] = None) -> Union[pdarray, Strings]:
     """
     Converts a Pandas Series to an Arkouda pdarray or Strings object. If
     dtype is None, the dtype is inferred from the Pandas Series. Otherwise,
-    the dtype parameter is set if the dtype of the Pandas Series is to be 
-    overridden or is  unknown (for example, in situations where the Series 
+    the dtype parameter is set if the dtype of the Pandas Series is to be
+    overridden or is  unknown (for example, in situations where the Series
     dtype is object).
-    
+
     Parameters
     ----------
     series : Pandas Series
@@ -37,7 +38,7 @@ def from_series(series : pd.Series,
     Returns
     -------
     Union[pdarray,Strings]
-    
+
     Raises
     ------
     TypeError
@@ -73,19 +74,19 @@ def from_series(series : pd.Series,
     array(['a', 'b', 'c', 'd', 'e'])
 
     >>> ak.from_series(pd.Series(pd.to_datetime(['1/1/2018', np.datetime64('2018-01-01')])))
-    array([1514764800000000000, 1514764800000000000])  
-    
+    array([1514764800000000000, 1514764800000000000])
+
     Notes
     -----
     The supported datatypes are bool, float64, int64, string, and datetime64[ns]. The
-    data type is either inferred from the the Series or is set via the dtype parameter. 
-    
+    data type is either inferred from the the Series or is set via the dtype parameter.
+
     Series of datetime or timedelta are converted to Arkouda arrays of dtype int64 (nanoseconds)
-    
+
     A Pandas Series containing strings has a dtype of object. Arkouda assumes the Series
     contains strings and sets the dtype to str
-    """ 
-    if not dtype:   
+    """
+    if not dtype:
         dt = series.dtype.name
     else:
         dt = str(dtype)
@@ -101,13 +102,14 @@ def from_series(series : pd.Series,
         n_array = series.to_numpy(dtype=SeriesDTypes[dt])
     except KeyError:
         raise ValueError(('dtype {} is unsupported. Supported dtypes are bool, ' +
-                      'float64, int64, string, datetime64[ns], and timedelta64[ns]').format(dt))
+                          'float64, int64, string, datetime64[ns], and timedelta64[ns]').format(dt))
     return array(n_array)
 
-def array(a : Union[pdarray,np.ndarray, Iterable]) -> Union[pdarray, Strings]:
+
+def array(a: Union[pdarray, np.ndarray, Iterable]) -> Union[pdarray, Strings]:
     """
-    Convert a Python or Numpy Iterable to a pdarray or Strings object, sending 
-    the corresponding data to the arkouda server. 
+    Convert a Python or Numpy Iterable to a pdarray or Strings object, sending
+    the corresponding data to the arkouda server.
 
     Parameters
     ----------
@@ -119,7 +121,7 @@ def array(a : Union[pdarray,np.ndarray, Iterable]) -> Union[pdarray, Strings]:
     pdarray or Strings
         A pdarray instance stored on arkouda server or Strings instance, which
         is composed of two pdarrays stored on arkouda server
-        
+
     Raises
     ------
     TypeError
@@ -143,24 +145,24 @@ def array(a : Union[pdarray,np.ndarray, Iterable]) -> Union[pdarray, Strings]:
     otherwise a RuntimeError will be raised. This is to protect the user
     from overwhelming the connection between the Python client and the arkouda
     server, under the assumption that it is a low-bandwidth connection. The user
-    may override this limit by setting ak.maxTransferBytes to a larger value, 
+    may override this limit by setting ak.maxTransferBytes to a larger value,
     but should proceed with caution.
-    
-    If the pdrray or ndarray is of type U, this method is called twice recursively 
-    to create the Strings object and the two corresponding pdarrays for string 
+
+    If the pdrray or ndarray is of type U, this method is called twice recursively
+    to create the Strings object and the two corresponding pdarrays for string
     bytes and offsets, respectively.
 
     Examples
     --------
     >>> ak.array(np.arange(1,10))
     array([1, 2, 3, 4, 5, 6, 7, 8, 9])
-    
+
     >>> ak.array(range(1,10))
     array([1, 2, 3, 4, 5, 6, 7, 8, 9])
-   
+
     >>> strings = ak.array(['string {}'.format(i) for i in range(0,5)])
     >>> type(strings)
-    <class 'arkouda.strings.Strings'>  
+    <class 'arkouda.strings.Strings'>
     """
     # If a is already a pdarray, do nothing
     if isinstance(a, pdarray):
@@ -172,12 +174,12 @@ def array(a : Union[pdarray,np.ndarray, Iterable]) -> Union[pdarray, Strings]:
             a = np.array(a)
         except:
             raise TypeError(('a must be a pdarray, np.ndarray, or convertible to' +
-                            ' a numpy array'))
+                             ' a numpy array'))
     # Only rank 1 arrays currently supported
     if a.ndim != 1:
         raise RuntimeError("Only rank-1 pdarrays or ndarrays supported")
     # Check if array of strings
-    if a.dtype.kind == 'U' or  'U' in a.dtype.kind:
+    if a.dtype.kind == 'U' or 'U' in a.dtype.kind:
         encoded = np.array([elem.encode() for elem in a])
         # Length of each string, plus null byte terminator
         lengths = np.array([len(elem) for elem in encoded]) + 1
@@ -192,7 +194,7 @@ def array(a : Union[pdarray,np.ndarray, Iterable]) -> Union[pdarray, Strings]:
         values = np.zeros(nbytes, dtype=np.uint8)
         for s, o in zip(encoded, offsets):
             for i, b in enumerate(s):
-                values[o+i] = b
+                values[o + i] = b
         # Recurse to create pdarrays for offsets and values, then return Strings object
         return Strings(cast(pdarray, array(offsets)), cast(pdarray, array(values)))
     # If not strings, then check that dtype is supported in arkouda
@@ -206,12 +208,13 @@ def array(a : Union[pdarray,np.ndarray, Iterable]) -> Union[pdarray, Strings]:
     # Pack binary array data into a bytes object with a command header
     # including the dtype and size
     fmt = ">{:n}{}".format(size, structDtypeCodes[a.dtype.name])
-    req_msg = "{} {:n} ".\
-                    format(a.dtype.name, size).encode() + struct.pack(fmt, *a)
+    req_msg = "{} {:n} ". \
+                  format(a.dtype.name, size).encode() + struct.pack(fmt, *a)
     repMsg = generic_msg(cmd='array', args=req_msg, send_bytes=True)
     return create_pdarray(repMsg)
 
-def zeros(size : int_scalars, dtype : type=np.float64) -> pdarray:
+
+def zeros(size: int_scalars, dtype: type = np.float64) -> pdarray:
     """
     Create a pdarray filled with zeros.
 
@@ -226,7 +229,7 @@ def zeros(size : int_scalars, dtype : type=np.float64) -> pdarray:
     -------
     pdarray
         Zeros of the requested size and dtype
-        
+
     Raises
     ------
     TypeError
@@ -249,18 +252,19 @@ def zeros(size : int_scalars, dtype : type=np.float64) -> pdarray:
     array([False, False, False, False, False])
     """
     if not np.isscalar(size):
-        raise TypeError("size must be a scalar, not {}".\
-                                     format(size.__class__.__name__))
-    dtype = akdtype(dtype) # normalize dtype
+        raise TypeError("size must be a scalar, not {}". \
+                        format(size.__class__.__name__))
+    dtype = akdtype(dtype)  # normalize dtype
     # check dtype for error
-    if cast(np.dtype,dtype).name not in NumericDTypes:
+    if cast(np.dtype, dtype).name not in NumericDTypes:
         raise TypeError("unsupported dtype {}".format(dtype))
     repMsg = generic_msg(cmd="create", args="{} {}".format(
-                                    cast(np.dtype,dtype).name, size))
-    
+        cast(np.dtype, dtype).name, size))
+
     return create_pdarray(repMsg)
 
-def ones(size : int_scalars, dtype : type=float64) -> pdarray:
+
+def ones(size: int_scalars, dtype: type = float64) -> pdarray:
     """
     Create a pdarray filled with ones.
 
@@ -275,7 +279,7 @@ def ones(size : int_scalars, dtype : type=float64) -> pdarray:
     -------
     pdarray
         Ones of the requested size and dtype
-        
+
     Raises
     ------
     TypeError
@@ -298,22 +302,23 @@ def ones(size : int_scalars, dtype : type=float64) -> pdarray:
     array([True, True, True, True, True])
     """
     if not np.isscalar(size):
-        raise TypeError("size must be a scalar, not {}".\
-                                            format(size.__class__.__name__))
-    dtype = akdtype(dtype) # normalize dtype
+        raise TypeError("size must be a scalar, not {}". \
+                        format(size.__class__.__name__))
+    dtype = akdtype(dtype)  # normalize dtype
     # check dtype for error
-    if cast(np.dtype,dtype).name not in NumericDTypes:
+    if cast(np.dtype, dtype).name not in NumericDTypes:
         raise TypeError("unsupported dtype {}".format(dtype))
     repMsg = generic_msg(cmd="create", args="{} {}".format(
-                                           cast(np.dtype,dtype).name, size))
+        cast(np.dtype, dtype).name, size))
     a = create_pdarray(repMsg)
     a.fill(1)
     return a
 
+
 @typechecked
-def zeros_like(pda : pdarray) -> pdarray:
+def zeros_like(pda: pdarray) -> pdarray:
     """
-    Create a zero-filled pdarray of the same size and dtype as an existing 
+    Create a zero-filled pdarray of the same size and dtype as an existing
     pdarray.
 
     Parameters
@@ -325,7 +330,7 @@ def zeros_like(pda : pdarray) -> pdarray:
     -------
     pdarray
         Equivalent to ak.zeros(pda.size, pda.dtype)
-        
+
     Raises
     ------
     TypeError
@@ -351,10 +356,11 @@ def zeros_like(pda : pdarray) -> pdarray:
     """
     return zeros(pda.size, pda.dtype)
 
+
 @typechecked
-def ones_like(pda : pdarray) -> pdarray:
+def ones_like(pda: pdarray) -> pdarray:
     """
-    Create a one-filled pdarray of the same size and dtype as an existing 
+    Create a one-filled pdarray of the same size and dtype as an existing
     pdarray.
 
     Parameters
@@ -366,7 +372,7 @@ def ones_like(pda : pdarray) -> pdarray:
     -------
     pdarray
         Equivalent to ak.ones(pda.size, pda.dtype)
-        
+
     Raises
     ------
     TypeError
@@ -375,12 +381,12 @@ def ones_like(pda : pdarray) -> pdarray:
     See Also
     --------
     ones, zeros_like
-    
+
     Notes
     -----
     Logic for generating the pdarray is delegated to the ak.ones method.
     Accordingly, the supported dtypes match are defined by the ak.ones method.
-    
+
     Examples
     --------
     >>> ones = ak.ones(5, dtype=ak.int64)
@@ -396,6 +402,7 @@ def ones_like(pda : pdarray) -> pdarray:
     array([True, True, True, True, True])
     """
     return ones(pda.size, pda.dtype)
+
 
 def arange(*args) -> pdarray:
     """
@@ -414,13 +421,13 @@ def arange(*args) -> pdarray:
         Stopping value (exclusive)
     stride : int_scalars, optional
         The difference between consecutive elements, the default stride is 1,
-        if stride is specified then start must also be specified. 
+        if stride is specified then start must also be specified.
 
     Returns
     -------
     pdarray, int64
         Integers from start (inclusive) to stop (exclusive) by stride
-        
+
     Raises
     ------
     TypeError
@@ -431,11 +438,11 @@ def arange(*args) -> pdarray:
     See Also
     --------
     linspace, zeros, ones, randint
-    
+
     Notes
     -----
-    Negative strides result in decreasing values. Currently, only int64 
-    pdarrays can be created with this method. For float64 arrays, use 
+    Negative strides result in decreasing values. Currently, only int64
+    pdarrays can be created with this method. For float64 arrays, use
     the linspace method.
 
     Examples
@@ -448,25 +455,25 @@ def arange(*args) -> pdarray:
 
     >>> ak.arange(0, 10, 2)
     array([0, 2, 4, 6, 8])
-    
+
     >>> ak.arange(-5, -10, -1)
     array([-5, -6, -7, -8, -9])
     """
-   
-    #if one arg is given then arg is stop
+
+    # if one arg is given then arg is stop
     if len(args) == 1:
         start = 0
         stop = args[0]
         stride = 1
 
-    #if two args are given then first arg is start and second is stop
+    # if two args are given then first arg is start and second is stop
     if len(args) == 2:
         start = args[0]
         stop = args[1]
         stride = 1
 
-    #if three args are given then first arg is start,
-    #second is stop, third is stride
+    # if three args are given then first arg is start,
+    # second is stop, third is stride
     if len(args) == 3:
         start = args[0]
         stop = args[1]
@@ -481,12 +488,13 @@ def arange(*args) -> pdarray:
         repMsg = generic_msg(cmd='arange', args="{} {} {}".format(start, stop, stride))
         return create_pdarray(repMsg)
     else:
-        raise TypeError("start,stop,stride must be type int or np.int64 {} {} {}".\
-                                    format(start,stop,stride))
+        raise TypeError("start,stop,stride must be type int or np.int64 {} {} {}". \
+                        format(start, stop, stride))
+
 
 @typechecked
-def linspace(start : numeric_scalars, 
-             stop : numeric_scalars, length : int_scalars) -> pdarray:
+def linspace(start: numeric_scalars,
+             stop: numeric_scalars, length: int_scalars) -> pdarray:
     """
     Create a pdarray of linearly-spaced floats in a closed interval.
 
@@ -503,7 +511,7 @@ def linspace(start : numeric_scalars,
     -------
     pdarray, float64
         Array of evenly spaced float values along the interval
-        
+
     Raises
     ------
     TypeError
@@ -512,7 +520,7 @@ def linspace(start : numeric_scalars,
     See Also
     --------
     arange
-    
+
     Notes
     -----
     If that start is greater than stop, the pdarray values are generated
@@ -536,11 +544,12 @@ def linspace(start : numeric_scalars,
     repMsg = generic_msg(cmd='linspace', args="{} {} {}".format(start, stop, length))
     return create_pdarray(repMsg)
 
+
 @typechecked
-def randint(low : numeric_scalars, high : numeric_scalars, 
-            size : int_scalars, dtype=int64, seed : int_scalars=None) -> pdarray:
+def randint(low: numeric_scalars, high: numeric_scalars,
+            size: int_scalars, dtype=int64, seed: int_scalars = None) -> pdarray:
     """
-    Generate a pdarray of randomized int, float, or bool values in a 
+    Generate a pdarray of randomized int, float, or bool values in a
     specified range bounded by the low and high parameters.
 
     Parameters
@@ -555,13 +564,13 @@ def randint(low : numeric_scalars, high : numeric_scalars,
         The dtype of the array
     seed : int_scalars
         Index for where to pull the first returned value
-        
+
 
     Returns
     -------
     pdarray
         Values drawn uniformly from the specified range having the desired dtype
-        
+
     Raises
     ------
     TypeError
@@ -585,19 +594,19 @@ def randint(low : numeric_scalars, high : numeric_scalars,
 
     >>> ak.randint(0, 1, 5, dtype=ak.bool)
     array([True, False, True, True, True])
-    
+
     >>> ak.randint(1, 5, 10, seed=2)
     array([4, 3, 1, 3, 4, 4, 2, 4, 3, 2])
 
     >>> ak.randint(1, 5, 3, dtype=ak.float64, seed=2)
     array([2.9160772326374946, 4.353429832157099, 4.5392023718621486])
-    
+
     >>> ak.randint(1, 5, 10, dtype=ak.bool, seed=2)
     array([False, True, True, True, True, False, True, True, True, True])
     """
     if size < 0 or high < low:
         raise ValueError("size must be > 0 and high > low")
-    dtype = akdtype(dtype) # normalize dtype
+    dtype = akdtype(dtype)  # normalize dtype
     # check dtype for error
     if dtype.name not in DTypes:
         raise TypeError("unsupported dtype {}".format(dtype))
@@ -605,16 +614,23 @@ def randint(low : numeric_scalars, high : numeric_scalars,
     highstr = NUMBER_FORMAT_STRINGS[dtype.name].format(high)
     sizestr = NUMBER_FORMAT_STRINGS['int64'].format(size)
 
-    repMsg = generic_msg(cmd='randint', args='{} {} {} {} {}'.\
-                         format(sizestr, dtype.name, lowstr, highstr, seed))
-    return create_pdarray(repMsg)
+    arr = pdarray(cmd='randint', cmd_args='{} {} {} {} {}'. \
+                  format(sizestr, dtype.name, lowstr, highstr, seed),
+                  mydtype=dtype.name, size=size, ndim=1, shape=[size], itemsize=dtype.itemsize)
+
+    generic_msg(cmd='randint', args='{} {} {} {} {}'. \
+                format(sizestr, dtype.name, lowstr, highstr, seed),
+                create_pdarray=True, buff_emptying=False, arr_id=arr.name)
+
+    return arr
+
 
 @typechecked
-def uniform(size : int_scalars, low : numeric_scalars=float(0.0), 
-            high : numeric_scalars=1.0, seed: Union[None, 
-                                               int_scalars]=None) -> pdarray:
+def uniform(size: int_scalars, low: numeric_scalars = float(0.0),
+            high: numeric_scalars = 1.0, seed: Union[None,
+                                                     int_scalars] = None) -> pdarray:
     """
-    Generate a pdarray with uniformly distributed random float values 
+    Generate a pdarray with uniformly distributed random float values
     in a specified range.
 
     Parameters
@@ -643,7 +659,7 @@ def uniform(size : int_scalars, low : numeric_scalars=float(0.0),
 
     Notes
     -----
-    The logic for uniform is delegated to the ak.randint method which 
+    The logic for uniform is delegated to the ak.randint method which
     is invoked with a dtype of float64
 
     Examples
@@ -656,8 +672,9 @@ def uniform(size : int_scalars, low : numeric_scalars=float(0.0),
     """
     return randint(low=low, high=high, size=size, dtype='float64', seed=seed)
 
+
 @typechecked
-def standard_normal(size : int_scalars, seed : Union[None, int_scalars]=None) -> pdarray:
+def standard_normal(size: int_scalars, seed: Union[None, int_scalars] = None) -> pdarray:
     """
     Draw real numbers from the standard normal distribution.
 
@@ -667,12 +684,12 @@ def standard_normal(size : int_scalars, seed : Union[None, int_scalars]=None) ->
         The number of samples to draw (size of the returned array)
     seed : int_scalars
         Value used to initialize the random number generator
-    
+
     Returns
     -------
     pdarray, float64
         The array of random numbers
-        
+
     Raises
     ------
     TypeError
@@ -689,23 +706,24 @@ def standard_normal(size : int_scalars, seed : Union[None, int_scalars]=None) ->
     For random samples from :math:`N(\\mu, \\sigma^2)`, use:
 
     ``(sigma * standard_normal(size)) + mu``
-    
+
     Examples
     --------
     >>> ak.standard_normal(3,1)
-    array([-0.68586185091150265, 1.1723810583573375, 0.567584107142031])  
+    array([-0.68586185091150265, 1.1723810583573375, 0.567584107142031])
     """
     if size < 0:
         raise ValueError("The size parameter must be > 0")
-    return create_pdarray(generic_msg(cmd='randomNormal', args='{} {}'.\
-                    format(NUMBER_FORMAT_STRINGS['int64'].format(size), seed)))
+    return create_pdarray(generic_msg(cmd='randomNormal', args='{} {}'. \
+                                      format(NUMBER_FORMAT_STRINGS['int64'].format(size), seed)))
+
 
 @typechecked
-def random_strings_uniform(minlen : int_scalars, maxlen : int_scalars, 
-                        size : int_scalars, characters : str='uppercase', 
-                           seed : Union[None, int_scalars]=None) -> Strings:
+def random_strings_uniform(minlen: int_scalars, maxlen: int_scalars,
+                           size: int_scalars, characters: str = 'uppercase',
+                           seed: Union[None, int_scalars] = None) -> Strings:
     """
-    Generate random strings with lengths uniformly distributed between 
+    Generate random strings with lengths uniformly distributed between
     minlen and maxlen, and with characters drawn from a specified set.
 
     Parameters
@@ -725,7 +743,7 @@ def random_strings_uniform(minlen : int_scalars, maxlen : int_scalars,
     -------
     Strings
         The array of random strings
-        
+
     Raises
     ------
     ValueError
@@ -734,13 +752,13 @@ def random_strings_uniform(minlen : int_scalars, maxlen : int_scalars,
     See Also
     --------
     random_strings_lognormal, randint
-    
+
     Examples
     --------
     >>> ak.random_strings_uniform(minlen=1, maxlen=5, seed=1, size=5)
     array(['TVKJ', 'EWAB', 'CO', 'HFMD', 'U'])
-    
-    >>> ak.random_strings_uniform(minlen=1, maxlen=5, seed=1, size=5, 
+
+    >>> ak.random_strings_uniform(minlen=1, maxlen=5, seed=1, size=5,
     ... characters='printable')
     array(['+5"f', '-P]3', '4k', '~HFF', 'F'])
     """
@@ -748,20 +766,21 @@ def random_strings_uniform(minlen : int_scalars, maxlen : int_scalars,
         raise ValueError(("Incompatible arguments: minlen < 0, maxlen " +
                           "< minlen, or size < 0"))
 
-    repMsg = generic_msg(cmd="randomStrings", args="{} {} {} {} {} {}".\
-          format(NUMBER_FORMAT_STRINGS['int64'].format(size),
-                 "uniform", characters,
-                 NUMBER_FORMAT_STRINGS['int64'].format(minlen),
-                 NUMBER_FORMAT_STRINGS['int64'].format(maxlen),
-                 seed))
-    return Strings(*(cast(str,repMsg).split('+')))
+    repMsg = generic_msg(cmd="randomStrings", args="{} {} {} {} {} {}". \
+                         format(NUMBER_FORMAT_STRINGS['int64'].format(size),
+                                "uniform", characters,
+                                NUMBER_FORMAT_STRINGS['int64'].format(minlen),
+                                NUMBER_FORMAT_STRINGS['int64'].format(maxlen),
+                                seed))
+    return Strings(*(cast(str, repMsg).split('+')))
+
 
 @typechecked
-def random_strings_lognormal(logmean : numeric_scalars, logstd : numeric_scalars, 
-            size : int_scalars, characters : str='uppercase', 
-                             seed : Optional[int_scalars]=None) -> Strings:
+def random_strings_lognormal(logmean: numeric_scalars, logstd: numeric_scalars,
+                             size: int_scalars, characters: str = 'uppercase',
+                             seed: Optional[int_scalars] = None) -> Strings:
     """
-    Generate random strings with log-normally distributed lengths and 
+    Generate random strings with log-normally distributed lengths and
     with characters drawn from a specified set.
 
     Parameters
@@ -781,11 +800,11 @@ def random_strings_lognormal(logmean : numeric_scalars, logstd : numeric_scalars
     -------
     Strings
         The Strings object encapsulating a pdarray of random strings
-    
+
     Raises
     ------
     TypeError
-        Raised if logmean is neither a float nor a int, logstd is not a float, 
+        Raised if logmean is neither a float nor a int, logstd is not a float,
         size is not an int, or if characters is not a str
     ValueError
         Raised if logstd <= 0 or size < 0
@@ -798,14 +817,14 @@ def random_strings_lognormal(logmean : numeric_scalars, logstd : numeric_scalars
     -----
     The lengths of the generated strings are distributed $Lognormal(\\mu, \\sigma^2)$,
     with :math:`\\mu = logmean` and :math:`\\sigma = logstd`. Thus, the strings will
-    have an average length of :math:`exp(\\mu + 0.5*\\sigma^2)`, a minimum length of 
+    have an average length of :math:`exp(\\mu + 0.5*\\sigma^2)`, a minimum length of
     zero, and a heavy tail towards longer strings.
-    
+
     Examples
     --------
     >>> ak.random_strings_lognormal(2, 0.25, 5, seed=1)
     array(['TVKJTE', 'ABOCORHFM', 'LUDMMGTB', 'KWOQNPHZ', 'VSXRRL'])
-    
+
     >>> ak.random_strings_lognormal(2, 0.25, 5, seed=1, characters='printable')
     array(['+5"fp-', ']3Q4kC~HF', '=F=`,IE!', 'DjkBa'9(', '5oZ1)='])
     """
@@ -814,10 +833,10 @@ def random_strings_lognormal(logmean : numeric_scalars, logstd : numeric_scalars
     if logstd <= 0 or size < 0:
         raise ValueError("Incompatible arguments: logstd <= 0 or size < 0")
 
-    repMsg = generic_msg(cmd="randomStrings", args="{} {} {} {} {} {}".\
-          format(NUMBER_FORMAT_STRINGS['int64'].format(size),
-                 "lognormal", characters,
-                 NUMBER_FORMAT_STRINGS['float64'].format(logmean),
-                 NUMBER_FORMAT_STRINGS['float64'].format(logstd),
-                 seed))
-    return Strings(*(cast(str,repMsg).split('+')))
+    repMsg = generic_msg(cmd="randomStrings", args="{} {} {} {} {} {}". \
+                         format(NUMBER_FORMAT_STRINGS['int64'].format(size),
+                                "lognormal", characters,
+                                NUMBER_FORMAT_STRINGS['float64'].format(logmean),
+                                NUMBER_FORMAT_STRINGS['float64'].format(logstd),
+                                seed))
+    return Strings(*(cast(str, repMsg).split('+')))
