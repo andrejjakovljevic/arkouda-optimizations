@@ -3,7 +3,7 @@ from typing import cast, List, Sequence
 from typeguard import typechecked
 import json, struct
 import numpy as np  # type: ignore
-from arkouda.client import generic_msg, RegisteredSymbols, EmptyRegistry
+from arkouda.client import generic_msg, RegisteredSymbols, EmptyRegistry, client_to_server_names
 from arkouda.dtypes import dtype, DTypes, resolve_scalar_dtype, \
     structDtypeCodes, translate_np_dtype, NUMBER_FORMAT_STRINGS, \
     int_scalars, numeric_scalars, numpy_scalars, int64
@@ -27,7 +27,7 @@ array_count = 1
 # Default dictionary so you can access cached pdarrays as
 # cache[type of stored value][size of pdarray]
 cache = dict()
-cache[int64] = defaultdict(list)
+cache[int64] = defaultdict(set)
 
 
 @typechecked
@@ -300,7 +300,7 @@ class pdarray:
         # print(self.size)
         # print(check_arr(self.dtype, self.size))
         if check_arr(self.dtype, self.size):
-            print("Calling mult and store")
+            print("Calling mult and store", self.name, ' ', other.name)
             return multAndStore(self, other, uncache_array(self.dtype, self.size))
         return self._binop(other, "*")
 
@@ -1926,7 +1926,9 @@ class RegistrationError(Exception):
 
 
 def cache_array(arr: pdarray):
-    cache[arr.dtype][arr.size].append(arr.name)
+    if not (arr.name in client_to_server_names):
+        return
+    cache[arr.dtype][arr.size].add(client_to_server_names[arr.name])
 
 
 def check_arr(dtype, arr_size):
@@ -1946,4 +1948,5 @@ def create_pdarray_with_name(name: str,cmd: str,cmd_args: str,
                                 mydtype: np.dtype, size: int_scalars, ndim: int_scalars, shape: Sequence[int], itemsize: int_scalars):
     arr = pdarray(cmd,cmd_args,mydtype,size,ndim,shape,itemsize)
     arr.name = name
+    client_to_server_names[arr.name]=name
     return arr

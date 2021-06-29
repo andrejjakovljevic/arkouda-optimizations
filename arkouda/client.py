@@ -596,8 +596,8 @@ def generic_msg(cmd: str, args: Union[str, bytes] = None, send_bytes: bool = Fal
                 itemsize = int(fields[6])
                 logger.debug(("created Chapel array with name: {} dtype: {} size: {} ndim: {} shape: {} " +
                               "itemsize: {}").format(name, mydtype, size, ndim, shape, itemsize))
-                print(arr_id,' and ',name)
                 client_to_server_names[arr_id] = name
+                print(arr_id,' ',name)
             return repMsg
 
         except KeyboardInterrupt as e:
