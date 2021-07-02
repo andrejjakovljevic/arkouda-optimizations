@@ -4,6 +4,8 @@ module MultiTypeSymEntry
     use ServerConfig;
     use Logging;
 
+    use arkouda_server;
+
     public use NumPyDType;
 
     public use SymArrayDmap;
@@ -104,9 +106,11 @@ module MultiTypeSymEntry
         :type etype: type
         */
         proc init(len: int, type etype) {
+            watch.start();
             super.init(etype, len);
             this.etype = etype;
             this.aD = makeDistDom(len);
+            watch.stop();
             // this.a uses default initialization
         }
 
@@ -116,10 +120,12 @@ module MultiTypeSymEntry
         :type a: [] ?etype
         */
         proc init(a: [?D] ?etype) {
+            watch.start();
             super.init(etype, D.size);
             this.etype = etype;
             this.aD = D;
             this.a = a;
+            watch.stop();
         }
 
         /*
