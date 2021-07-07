@@ -68,7 +68,6 @@ def triangle_count_scalar(L: np.ndarray, nblocks_m, nblocks_n, nblocks_l):
             for k in range(nblocks_l):
                 # ak.multAndStore(bA[i * nblocks_l + k], bB[k * nblocks_n + j], mxm_result)
                 # ak.multAndStore(mxm_result, bM[i * nblocks_n + j], mxm_mask_result)
-
                 # print("\n*** mxm_result line *** ")
                 mxm_result = bA[i * nblocks_l + k] * bB[k * nblocks_n + j]
                 # print("mxm_result id is", mxm_result.name)
@@ -91,10 +90,9 @@ def create_blocks_scalar(A: np.ndarray, row_size, col_size):
     num_rows = A.shape[0] // row_size
     num_cols = A.shape[0] // col_size
     out = []
-
     for r in range(num_rows):
         for c in range(num_cols):
-            M = ak.randint(0, 100, 1)
+            M = ak.arange(min(r,c),min(r,c)+1,1)
             out.append(M)
 
     return out
@@ -108,6 +106,7 @@ x = np.array([[0, 0, 0, 0],
 ak.connect(connect_url='tcp://andrej-X556UQ:5555')
 start = time.perf_counter()
 print(triangle_count_scalar(x, 2, 2, 2))
+# print(triangle_count_numpy(x, 2, 2, 2, False))
 end = time.perf_counter()
 print(f"triangle count took {end - start:0.9f} seconds")
 #ak.disconnect()

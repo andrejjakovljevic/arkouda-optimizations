@@ -9,7 +9,7 @@ from arkouda.message import RequestMessage, MessageFormat, ReplyMessage, \
     MessageType
 from queue import Queue
 
-__all__ = ["connect", "disconnect", "shutdown", "get_config", "get_mem_used", "ruok"]
+__all__ = ["connect", "disconnect", "shutdown", "get_config", "get_mem_used", "ruok", "generic_msg", "client_to_server_names"]
 
 # stuff for zmq connection
 pspStr = ''
@@ -35,7 +35,7 @@ clientLogger = getArkoudaLogger(name='Arkouda User Logger', logFormat='%(message
 print('{}'.format(pyfiglet.figlet_format('Arkouda')))
 print('Client Version: {}'.format(__version__)) # type: ignore
 
-queue_size : int = 10
+queue_size: int = 50
 
 q = Queue(queue_size)
 client_to_server_names = {}
@@ -510,7 +510,7 @@ def shutdown() -> None:
 
 def generic_msg(cmd: str, args: Union[str, bytes] = None, send_bytes: bool = False,
                 recv_bytes: bool = False, return_value_needed: bool = False,
-                create_pdarray: bool = False, buff_emptying: bool = False, arr_id: str = None) -> Union[str, bytes]:
+                create_pdarray: bool = False, buff_emptying: bool = False, arr_id: str = None, my_pdarray = None) -> Union[str, bytes]:
     """
     Sends a binary or string message composed of a command and corresponding 
     arguments to the arkouda_server, returning the response sent by the server.
@@ -552,30 +552,34 @@ def generic_msg(cmd: str, args: Union[str, bytes] = None, send_bytes: bool = Fal
         raise RuntimeError("client is not connected to a server")
 
     if send_bytes:
-            buff_item = BufferItem(cmd=cmd,
-                                   args=cast(bytes, args),
-                                   send_bytes=send_bytes,
-                                   recv_bytes=recv_bytes,
-                                   create_pdarray=create_pdarray,
-                                   pdarray_id=arr_id)
+        buff_item = BufferItem(cmd=cmd,
+                               args=cast(bytes, args),
+                               send_bytes=send_bytes,
+                               recv_bytes=recv_bytes,
+                               create_pdarray=create_pdarray,
+                               pdarray_id=arr_id,
+                               my_pd_array=my_pdarray)
     else:
         buff_item = BufferItem(cmd=cmd,
                                 args=cast(str, args),
                                 send_bytes=send_bytes,
                                 recv_bytes=recv_bytes,
                                 create_pdarray=create_pdarray,
-                                pdarray_id=arr_id)
-
+                                pdarray_id=arr_id,
+                                my_pd_array=my_pdarray)
 
     if return_value_needed and not q.empty() and not buff_emptying:
-        #buff_empty()
         buff_push(buff_item)
         execute_with_dependencies(buff_item)
+
+    # print("----MAP----")
+    # for (key, value) in client_to_server_names.items():
+    #    print("key=", key, "value=", value)
 
     if return_value_needed or buff_emptying:
         try:
             # Transform the args with client to server names
-            args=transform_args(args)
+            args = transform_args(args)
             # Send the message
             if send_bytes:
                 repMsg = _send_binary_message(cmd=cmd,
@@ -705,7 +709,7 @@ def ruok() -> str:
 
 class BufferItem:
     def __init__(self, cmd: str, args: Union[str, bytes] = None, send_bytes: bool = False,
-                 recv_bytes: bool = False, create_pdarray: bool = False, pdarray_id: str = None, executed: bool = False):
+                 recv_bytes: bool = False, create_pdarray: bool = False, pdarray_id: str = None, executed: bool = False, my_pd_array = None):
         self.cmd = cmd
         self.args = args
         self.send_bytes = send_bytes
@@ -714,6 +718,7 @@ class BufferItem:
         self.pdarray_id = pdarray_id
         self.dependencies = []
         self.executed = executed
+        self.my_pd_array = my_pd_array
 
     def __str__(self):
         return "Buffer Item, Cmd={0}, Args={1}, Pdarray_id={2}".format(self.cmd, self.args, self.pdarray_id)
@@ -725,7 +730,7 @@ class BufferItem:
         self.executed=True
 
 def buff_push(item: BufferItem):
-    #transform_args(item)
+    #item.args=transform_args(item.args)
     q.put(item)
     make_dependencies(item)
     if q.full():
@@ -738,25 +743,22 @@ def is_temporary(arg: str):
         return False
 
 def make_dependencies(item: BufferItem):
-    #print('starting length of dependencies:',len(item.dependencies))
-    args_list = list()
+    # print('starting length of dependencies:',len(item.dependencies))
     args_list = item.args.split(" ")
-    args_list=args_list[1:]
-    if (item.cmd=="binopvvStore"): #exclude the variable that we store into
-        args_list=args_list[:-1]
-    args_list=list(filter(is_temporary,args_list))
-    #print("args_list=",args_list)
+    # args_list = args_list[1:]
+    args_list = list(filter(is_temporary, args_list))
+    # print("args_list=",args_list)
     for q_elem in reversed(list(q.queue)):
         if (q_elem is item):
             continue
         args_list_q_elem=list()
-        for arg in q_elem.args:
+        for arg in q_elem.args.split(" "):
             args_list_q_elem.append(arg)
         if (q_elem.pdarray_id!=None):
             args_list_q_elem.append(q_elem.pdarray_id)
-        args_list_q_elem=list(filter(is_temporary,args_list_q_elem))
+        # args_list_q_elem=list(filter(is_temporary, args_list_q_elem))
         for arg_q_elem in args_list_q_elem:
-            if (arg_q_elem in args_list and not(q_elem in item.dependencies)):
+            if arg_q_elem in args_list and not(q_elem in item.dependencies):
                 item.dependencies.append(q_elem)
 
 def remove_from_queue(item: BufferItem):

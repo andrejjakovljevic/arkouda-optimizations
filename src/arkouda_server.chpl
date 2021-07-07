@@ -24,6 +24,9 @@ use Message;
 private config const logLevel = ServerConfig.logLevel;
 const asLogger = new Logger(logLevel);
 
+var watch = new Time.Timer();
+watch.clear();
+
 proc initArkoudaDirectory() {
     var arkDirectory = '%s%s%s'.format(here.cwd(), pathSep,'.arkouda');
     initDirectory(arkDirectory);

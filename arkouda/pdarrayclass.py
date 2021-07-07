@@ -3,7 +3,7 @@ from typing import cast, List, Sequence
 from typeguard import typechecked
 import json, struct
 import numpy as np  # type: ignore
-from arkouda.client import generic_msg, RegisteredSymbols, EmptyRegistry, client_to_server_names
+from arkouda.client import generic_msg, client_to_server_names
 from arkouda.dtypes import dtype, DTypes, resolve_scalar_dtype, \
     structDtypeCodes, translate_np_dtype, NUMBER_FORMAT_STRINGS, \
     int_scalars, numeric_scalars, numpy_scalars, int64
@@ -11,14 +11,14 @@ from arkouda.dtypes import int64 as akint64
 from arkouda.dtypes import str_ as akstr_
 from arkouda.dtypes import bool as npbool
 from arkouda.logger import getArkoudaLogger
-from arkouda.infoclass import list_registry, information, pretty_print_information
 from collections import defaultdict
+from arkouda.infoclass import list_registry, information, pretty_print_information
 import builtins
 
-__all__ = ["pdarray", "info", "clear", "any", "all", "is_sorted", "list_registry", "sum", "prod",
+__all__ = ["pdarray", "clear", "any", "all", "is_sorted", "sum", "prod",
            "min", "max", "argmin", "argmax", "mean", "var", "std", "mink",
            "maxk", "argmink", "argmaxk", "attach_pdarray",
-           "unregister_pdarray", "RegistrationError", "multAndStore"]
+           "RegistrationError", "multAndStore"]
 
 logger = getArkoudaLogger(name='pdarrayclass')
 
@@ -1346,7 +1346,7 @@ def sum(pda: pdarray) -> np.float64:
     RuntimeError
         Raised if there's a server-side error thrown
     """
-    repMsg = generic_msg(cmd="reduction", args="{} {}".format("sum", pda.name), return_value_needed=True)
+    repMsg = generic_msg(cmd="reduction", args="{} {}".format("sum", pda.name), return_value_needed=True, my_pdarray=pda)
     return parse_single_value(cast(str, repMsg))
 
 
@@ -1913,10 +1913,11 @@ def unregister_pdarray_by_name(user_defined_name:str) -> None:
 @typechecked
 def multAndStore(pda_left: pdarray, pda_right: pdarray, pda_store_name: str) -> pdarray:
     cmd = "binopvvStore"
+    arr = create_pdarray_with_name(pda_store_name, cmd, "", pda_left.dtype, pda_left.size, pda_left.ndim, pda_left.shape, pda_left.itemsize)
     args = "{} {} {} {}". \
-        format("*", pda_left.name, pda_right.name, pda_store_name)
-    generic_msg(cmd=cmd, args=args)
-    arr = create_pdarray_with_name(pda_store_name,cmd,args,pda_left.dtype,pda_left.size,pda_left.ndim,pda_left.shape,pda_left.itemsize)
+        format("*", pda_left.name, pda_right.name, arr.name)
+    arr.cmd_args=args
+    generic_msg(cmd=cmd, args=args, my_pdarray=arr)
     return arr
 
 
@@ -1928,7 +1929,9 @@ class RegistrationError(Exception):
 def cache_array(arr: pdarray):
     if not (arr.name in client_to_server_names):
         return
+    print("Caching ",client_to_server_names[arr.name])
     cache[arr.dtype][arr.size].add(client_to_server_names[arr.name])
+    client_to_server_names.pop(arr.name)
 
 
 def check_arr(dtype, arr_size):
@@ -1944,9 +1947,9 @@ def uncache_array(dtype, arr_size):
         return arr
 
 @typechecked
-def create_pdarray_with_name(name: str,cmd: str,cmd_args: str,
+def create_pdarray_with_name(name: str,cmd: str, cmd_args: str,
                                 mydtype: np.dtype, size: int_scalars, ndim: int_scalars, shape: Sequence[int], itemsize: int_scalars):
-    arr = pdarray(cmd,cmd_args,mydtype,size,ndim,shape,itemsize)
-    arr.name = name
+    arr = pdarray(cmd, cmd_args, mydtype, size, ndim, shape, itemsize)
     client_to_server_names[arr.name]=name
+    print("create with name",arr.name,name)
     return arr

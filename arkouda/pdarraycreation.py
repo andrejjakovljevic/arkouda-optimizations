@@ -485,8 +485,17 @@ def arange(*args) -> pdarray:
     if isSupportedInt(start) and isSupportedInt(stop) and isSupportedInt(stride):
         if stride < 0:
             stop = stop + 2
-        repMsg = generic_msg(cmd='arange', args="{} {} {}".format(start, stop, stride))
-        return create_pdarray(repMsg)
+        # repMsg = generic_msg(cmd='arange', args="{} {} {}".format(start, stop, stride))
+        arr = pdarray(cmd='arange', cmd_args='{} {} {}'. \
+                      format(start, stop, stride),
+                      mydtype=int64, size=(stop-start)//stride, ndim=1, shape=[(stop-start)//stride], itemsize=int64.itemsize)
+
+        generic_msg(cmd='arange', args='{} {} {}'. \
+                    format(start, stop, stride),
+                    create_pdarray=True, buff_emptying=False, arr_id=arr.name)
+
+        return arr
+        # return create_pdarray(repMsg)
     else:
         raise TypeError("start,stop,stride must be type int or np.int64 {} {} {}". \
                         format(start, stop, stride))
