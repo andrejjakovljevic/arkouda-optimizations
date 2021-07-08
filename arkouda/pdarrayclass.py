@@ -18,7 +18,7 @@ import builtins
 __all__ = ["pdarray", "clear", "any", "all", "is_sorted", "sum", "prod",
            "min", "max", "argmin", "argmax", "mean", "var", "std", "mink",
            "maxk", "argmink", "argmaxk", "attach_pdarray",
-           "RegistrationError", "multAndStore"]
+           "RegistrationError", "multAndStore", "binOpWithStore"]
 
 logger = getArkoudaLogger(name='pdarrayclass')
 
@@ -147,11 +147,11 @@ class pdarray:
 
     def __str__(self):
         from arkouda.client import pdarrayIterThresh
-        return generic_msg(cmd='str', args='{} {}'.format(self.name, pdarrayIterThresh))
+        return generic_msg(cmd='str', args='{} {}'.format(self.name, pdarrayIterThresh), return_value_needed=True)
 
     def __repr__(self):
         from arkouda.client import pdarrayIterThresh
-        return generic_msg(cmd='repr', args='{} {}'.format(self.name, pdarrayIterThresh))
+        return generic_msg(cmd='repr', args='{} {}'.format(self.name, pdarrayIterThresh), return_value_needed=True)
 
     def format_other(self, other: object) -> np.dtype:
         """
@@ -281,6 +281,8 @@ class pdarray:
 
     # overload + for pdarray, other can be {pdarray, int, float}
     def __add__(self, other):
+        if isinstance(other, pdarray) and check_arr(self.dtype, self.size):
+            return binOpWithStore(self, other, uncache_array(self.dtype, self.size), "+")
         return self._binop(other, "+")
 
     def __radd__(self, other):
@@ -288,6 +290,8 @@ class pdarray:
 
     # overload - for pdarray, other can be {pdarray, int, float}
     def __sub__(self, other):
+        if isinstance(other, pdarray) and check_arr(self.dtype, self.size):
+            return binOpWithStore(self, other, uncache_array(self.dtype, self.size), "-")
         return self._binop(other, "-")
 
     def __rsub__(self, other):
@@ -295,13 +299,13 @@ class pdarray:
 
     # overload * for pdarray, other can be {pdarray, int, float}
     def __mul__(self, other):
-        print("Checking array")
+        # print("Checking array")
         # print(self.dtype)
         # print(self.size)
         # print(check_arr(self.dtype, self.size))
-        if check_arr(self.dtype, self.size):
-            print("Calling mult and store", self.name, ' ', other.name)
-            return multAndStore(self, other, uncache_array(self.dtype, self.size))
+        if isinstance(other, pdarray) and check_arr(self.dtype, self.size):
+            # print("Calling mult and store", self.name, ' ', other.name)
+            return binOpWithStore(self, other, uncache_array(self.dtype, self.size), "*")
         return self._binop(other, "*")
 
     def __rmul__(self, other):
@@ -309,6 +313,8 @@ class pdarray:
 
     # overload / for pdarray, other can be {pdarray, int, float}
     def __truediv__(self, other):
+        if isinstance(other, pdarray) and check_arr(self.dtype, self.size):
+            return binOpWithStore(self, other, uncache_array(self.dtype, self.size), "/")
         return self._binop(other, "/")
 
     def __rtruediv__(self, other):
@@ -1909,6 +1915,16 @@ def unregister_pdarray_by_name(user_defined_name:str) -> None:
     """
     repMsg = generic_msg(cmd="unregister", args=user_defined_name)
 
+@typechecked
+def binOpWithStore(pda_left: pdarray, pda_right: pdarray, pda_store_name: str, binop: str) -> pdarray:
+    cmd = "binopvvStore"
+    arr = create_pdarray_with_name(pda_store_name, cmd, "", pda_left.dtype, pda_left.size, pda_left.ndim,
+                                   pda_left.shape, pda_left.itemsize)
+    args = "{} {} {} {}". \
+        format(binop, pda_left.name, pda_right.name, arr.name)
+    arr.cmd_args = args
+    generic_msg(cmd=cmd, args=args, my_pdarray=arr)
+    return arr
 
 @typechecked
 def multAndStore(pda_left: pdarray, pda_right: pdarray, pda_store_name: str) -> pdarray:
@@ -1916,7 +1932,7 @@ def multAndStore(pda_left: pdarray, pda_right: pdarray, pda_store_name: str) -> 
     arr = create_pdarray_with_name(pda_store_name, cmd, "", pda_left.dtype, pda_left.size, pda_left.ndim, pda_left.shape, pda_left.itemsize)
     args = "{} {} {} {}". \
         format("*", pda_left.name, pda_right.name, arr.name)
-    arr.cmd_args=args
+    arr.cmd_args = args
     generic_msg(cmd=cmd, args=args, my_pdarray=arr)
     return arr
 

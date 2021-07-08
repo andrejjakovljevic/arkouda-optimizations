@@ -294,7 +294,7 @@ proc main() {
              */
             var binaryRepMsg: bytes;
             var repTuple: MsgTuple;
-
+            num = num +1;
             select cmd
             {
                 when "array"             {repTuple = arrayMsg(cmd, payload, st);}

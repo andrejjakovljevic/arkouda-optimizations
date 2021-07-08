@@ -35,7 +35,7 @@ clientLogger = getArkoudaLogger(name='Arkouda User Logger', logFormat='%(message
 print('{}'.format(pyfiglet.figlet_format('Arkouda')))
 print('Client Version: {}'.format(__version__)) # type: ignore
 
-queue_size: int = 50
+queue_size: int = 5
 
 q = Queue(queue_size)
 client_to_server_names = {}
@@ -568,15 +568,15 @@ def generic_msg(cmd: str, args: Union[str, bytes] = None, send_bytes: bool = Fal
                                 pdarray_id=arr_id,
                                 my_pd_array=my_pdarray)
 
-    if return_value_needed and not q.empty() and not buff_emptying:
+    if return_value_needed and not buff_emptying:
         buff_push(buff_item)
-        execute_with_dependencies(buff_item)
+        return execute_with_dependencies(buff_item)
 
     # print("----MAP----")
     # for (key, value) in client_to_server_names.items():
     #    print("key=", key, "value=", value)
 
-    if return_value_needed or buff_emptying:
+    if buff_emptying or return_value_needed:
         try:
             # Transform the args with client to server names
             args = transform_args(args)
@@ -724,10 +724,10 @@ class BufferItem:
         return "Buffer Item, Cmd={0}, Args={1}, Pdarray_id={2}".format(self.cmd, self.args, self.pdarray_id)
 
     def execute(self):
-        generic_msg(self.cmd, self.args, self.send_bytes, self.recv_bytes,
+        self.executed = True
+        return generic_msg(self.cmd, self.args, self.send_bytes, self.recv_bytes,
                     return_value_needed=True, create_pdarray=self.create_pdarray,
                     buff_emptying=True, arr_id=self.pdarray_id)
-        self.executed=True
 
 def buff_push(item: BufferItem):
     #item.args=transform_args(item.args)
@@ -744,6 +744,8 @@ def is_temporary(arg: str):
 
 def make_dependencies(item: BufferItem):
     # print('starting length of dependencies:',len(item.dependencies))
+    if item.args is None:
+        return
     args_list = item.args.split(" ")
     # args_list = args_list[1:]
     args_list = list(filter(is_temporary, args_list))
@@ -793,8 +795,8 @@ def execute_with_dependencies(item: BufferItem):
         return
     for dependency in item.dependencies:
         execute_with_dependencies(dependency)
-    item.execute()
     remove_from_queue(item)
+    return item.execute()
 
 
 def buff_empty():

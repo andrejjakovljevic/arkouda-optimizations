@@ -59,38 +59,42 @@ def triangle_count_scalar(L: np.ndarray, nblocks_m, nblocks_n, nblocks_l):
     bB = create_blocks_scalar(L, bl, bn)
     bM = create_blocks_scalar(L, bm, bn)
 
-    # mxm_result = ak.zeros(1, dtype=np.int64)
-    # mxm_mask_result = ak.zeros(1, dtype=np.int64)
+    mxm_result = ak.randint(0, 100, 1)
+    mxm_mask_result = ak.randint(0, 100, 1)
 
     s = 0
     for i in range(nblocks_m):
         for j in range(nblocks_n):
             for k in range(nblocks_l):
-                # ak.multAndStore(bA[i * nblocks_l + k], bB[k * nblocks_n + j], mxm_result)
-                # ak.multAndStore(mxm_result, bM[i * nblocks_n + j], mxm_mask_result)
+                ak.multAndStore(bA[i * nblocks_l + k], bB[k * nblocks_n + j], mxm_result)
+                ak.multAndStore(mxm_result, bM[i * nblocks_n + j], mxm_mask_result)
+
                 # print("\n*** mxm_result line *** ")
-                mxm_result = bA[i * nblocks_l + k] * bB[k * nblocks_n + j]
+                # mxm_result = bA[i * nblocks_l + k] * bB[k * nblocks_n + j]
                 # print("mxm_result id is", mxm_result.name)
                 # print("*** mxm_result line ***\n")
                 # print("\n*** mxm_mask_result line *** ")
-                mxm_mask_result = mxm_result * bM[i * nblocks_n + j]
+                # mxm_mask_result = mxm_result * bM[i * nblocks_n + j]
                 # print("mxm_mask_result id is", mxm_mask_result.name)
                 # print("*** mxm_mask_result line ***\n")
                 s += ak.sum(mxm_mask_result)
+
+                # mxm_result.__del__()
+                # mxm_mask_result.__del__()
 
                 # s += ak.sum((bA[i * nblocks_l + k] * bB[k * nblocks_n + j]) * bM[i * nblocks_n + j])
 
     return s
 
+
 def create_blocks_scalar(A: np.ndarray, row_size, col_size):
     num_rows = A.shape[0] // row_size
     num_cols = A.shape[0] // col_size
     out = []
-    count = 0
+
     for r in range(num_rows):
         for c in range(num_cols):
-            M = ak.arange(count, count+1, 1)
-            count = count * 2
+            M = ak.randint(0, 100, 1)
             out.append(M)
 
     return out
@@ -103,9 +107,9 @@ x = np.array([[0, 0, 0, 0],
 
 ak.connect(connect_url='tcp://andrej-X556UQ:5555')
 start = time.perf_counter()
-print(triangle_count_scalar(x, 2, 2, 2))
-# print(triangle_count_numpy(x, 2, 2, 2, False))
+a = ak.randint(0,100,20)
+print(a)
 end = time.perf_counter()
 print(f"triangle count took {end - start:0.9f} seconds")
-#ak.disconnect()
+# ak.disconnect()
 ak.shutdown()
