@@ -35,7 +35,7 @@ clientLogger = getArkoudaLogger(name='Arkouda User Logger', logFormat='%(message
 print('{}'.format(pyfiglet.figlet_format('Arkouda')))
 print('Client Version: {}'.format(__version__)) # type: ignore
 
-queue_size: int = 5
+queue_size: int = 10
 
 q = Queue(queue_size)
 client_to_server_names = {}
@@ -232,7 +232,7 @@ def _set_access_token(access_token: Optional[str],
         The arkouda_server host:port connect string, defaults to localhost:5555
 
     Returns
-    -------
+    -------my_pdarray
     str
         The access token configured for the host:port, None if there is no
         token configured for the host:port

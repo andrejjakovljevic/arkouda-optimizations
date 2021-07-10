@@ -258,8 +258,15 @@ def zeros(size: int_scalars, dtype: type = np.float64) -> pdarray:
     # check dtype for error
     if cast(np.dtype, dtype).name not in NumericDTypes:
         raise TypeError("unsupported dtype {}".format(dtype))
-    repMsg = generic_msg(cmd="create", args="{} {}".format(
-        cast(np.dtype, dtype).name, size))
+    # repMsg = generic_msg(cmd="create", args="{} {}".format(cast(np.dtype, dtype).name, size))
+
+    arr = pdarray(cmd='create', cmd_args='{} {}'.format(cast(np.dtype, dtype).name, size),  mydtype=dtype.name, size=size, ndim=1, shape=[size], itemsize=dtype.itemsize)
+
+    generic_msg(cmd='create', args='{} {}'. \
+                format(cast(np.dtype, dtype).name, size),
+                create_pdarray=True, buff_emptying=False, arr_id=arr.name)
+
+    return arr
 
     return create_pdarray(repMsg)
 

@@ -89,8 +89,8 @@ def create_blocks_scalar(A: np.ndarray, row_size, col_size):
     count = 0
     for r in range(num_rows):
         for c in range(num_cols):
-            M = ak.arange(count, count+1, 1)
-            count = count * 2
+            M = ak.zeros(1, dtype=ak.int64)
+            count = count + 2
             out.append(M)
 
     return out

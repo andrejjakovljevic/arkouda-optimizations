@@ -225,7 +225,7 @@ class pdarray:
             args = "{} {} {}".format(op, self.name, other.name)
             arr = pdarray(cmd=cmd, cmd_args=args, mydtype=self.dtype, size=self.size,
                           ndim=1, shape=self.shape, itemsize=self.itemsize)
-            generic_msg(cmd=cmd, args=args, create_pdarray=True, arr_id=arr.name)
+            generic_msg(cmd=cmd, args=args, create_pdarray=True, arr_id=arr.name, my_pdarray=[self, other, arr])
             return arr
         # pdarray binop scalar
         dt = resolve_scalar_dtype(other)
@@ -1352,7 +1352,7 @@ def sum(pda: pdarray) -> np.float64:
     RuntimeError
         Raised if there's a server-side error thrown
     """
-    repMsg = generic_msg(cmd="reduction", args="{} {}".format("sum", pda.name), return_value_needed=True, my_pdarray=pda)
+    repMsg = generic_msg(cmd="reduction", args="{} {}".format("sum", pda.name), return_value_needed=True, my_pdarray=[pda])
     return parse_single_value(cast(str, repMsg))
 
 
@@ -1923,7 +1923,7 @@ def binOpWithStore(pda_left: pdarray, pda_right: pdarray, pda_store_name: str, b
     args = "{} {} {} {}". \
         format(binop, pda_left.name, pda_right.name, arr.name)
     arr.cmd_args = args
-    generic_msg(cmd=cmd, args=args, my_pdarray=arr)
+    generic_msg(cmd=cmd, args=args, my_pdarray=[pda_left,pda_right,arr])
     return arr
 
 @typechecked
@@ -1933,7 +1933,7 @@ def multAndStore(pda_left: pdarray, pda_right: pdarray, pda_store_name: str) -> 
     args = "{} {} {} {}". \
         format("*", pda_left.name, pda_right.name, arr.name)
     arr.cmd_args = args
-    generic_msg(cmd=cmd, args=args, my_pdarray=arr)
+    generic_msg(cmd=cmd, args=args, my_pdarray=[pda_left,pda_right,arr])
     return arr
 
 
@@ -1943,9 +1943,7 @@ class RegistrationError(Exception):
 
 
 def cache_array(arr: pdarray):
-    if not (arr.name in client_to_server_names):
-        return
-    print("Caching ",client_to_server_names[arr.name])
+    print("Caching ", client_to_server_names[arr.name])
     cache[arr.dtype][arr.size].add(client_to_server_names[arr.name])
     client_to_server_names.pop(arr.name)
 
