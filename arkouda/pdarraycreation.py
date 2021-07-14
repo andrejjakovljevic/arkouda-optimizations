@@ -8,7 +8,7 @@ from arkouda.dtypes import structDtypeCodes, NUMBER_FORMAT_STRINGS, float64, int
     DTypes, isSupportedInt, isSupportedNumber, NumericDTypes, SeriesDTypes, \
     int_scalars, numeric_scalars
 from arkouda.dtypes import dtype as akdtype
-from arkouda.pdarrayclass import pdarray, create_pdarray, check_arr, uncache_array
+from arkouda.pdarrayclass import pdarray, create_pdarray, check_arr, uncache_array, create_pdarray_with_name
 from arkouda.strings import Strings
 
 __all__ = ["array", "zeros", "ones", "zeros_like", "ones_like",
@@ -611,7 +611,10 @@ def randint(low: numeric_scalars, high: numeric_scalars,
     >>> ak.randint(0, 1, 5, dtype=ak.bool)
     array([True, False, True, True, True])
 
-    >>> ak.randint(1, 5, 10, seed=2)
+    >>> ak.randint(1, 5, 10, seed=2)            "compute time = %i sec".format(Time.getCurrentTime() - t1));
+            }
+            when (DType.Bool) {
+                var t1 = Time.g
     array([4, 3, 1, 3, 4, 4, 2, 4, 3, 2])
 
     >>> ak.randint(1, 5, 3, dtype=ak.float64, seed=2)
@@ -630,13 +633,25 @@ def randint(low: numeric_scalars, high: numeric_scalars,
     highstr = NUMBER_FORMAT_STRINGS[dtype.name].format(high)
     sizestr = NUMBER_FORMAT_STRINGS['int64'].format(size)
 
-    arr = pdarray(cmd='randint', cmd_args='{} {} {} {} {}'. \
-                  format(sizestr, dtype.name, lowstr, highstr, seed),
-                  mydtype=dtype.name, size=size, ndim=1, shape=[size], itemsize=dtype.itemsize)
+    if check_arr(dtype, size):
+        cmd = "randintStore"
+        name = uncache_array(dtype, size)
 
-    generic_msg(cmd='randint', args='{} {} {} {} {}'. \
-                format(sizestr, dtype.name, lowstr, highstr, seed),
-                create_pdarray=True, buff_emptying=False, arr_id=arr.name)
+        arr = create_pdarray_with_name(name, cmd, "", dtype, size, 1,
+                                       [size], dtype.itemsize)
+        args = '{} {} {} {} {} {}'. \
+            format(sizestr, dtype.name, lowstr, highstr, seed, name)
+        arr.cmd_args = args
+        generic_msg(cmd=cmd, args=args, arr_id=arr.name, my_pdarray=[arr])
+
+    else:
+        arr = pdarray(cmd='randint', cmd_args='{} {} {} {} {}'. \
+                      format(sizestr, dtype.name, lowstr, highstr, seed),
+                      mydtype=dtype.name, size=size, ndim=1, shape=[size], itemsize=dtype.itemsize)
+
+        generic_msg(cmd='randint', args='{} {} {} {} {}'. \
+                    format(sizestr, dtype.name, lowstr, highstr, seed),
+                    create_pdarray=True, buff_emptying=False, arr_id=arr.name)
 
     return arr
 

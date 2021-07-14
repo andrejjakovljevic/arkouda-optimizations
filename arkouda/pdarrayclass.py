@@ -3,7 +3,7 @@ from typing import cast, List, Sequence
 from typeguard import typechecked
 import json, struct
 import numpy as np  # type: ignore
-from arkouda.client import generic_msg, client_to_server_names
+from arkouda.client import generic_msg, client_to_server_names, id_to_args, args_to_id
 from arkouda.dtypes import dtype, DTypes, resolve_scalar_dtype, \
     structDtypeCodes, translate_np_dtype, NUMBER_FORMAT_STRINGS, \
     int_scalars, numeric_scalars, numpy_scalars, int64
@@ -92,7 +92,7 @@ class pdarray:
     Attributes
     ----------
     name : str
-        The server-side identifier for the array
+        The client-side identifier for the array
     dtype : dtype
         The element type of the array
     size : int_scalars
@@ -126,11 +126,17 @@ class pdarray:
         self.ndim = ndim
         self.shape = shape
         self.itemsize = itemsize
+        id_to_args[self.name] = self.cmd + ":" + self.cmd_args
+        args_to_id[self.cmd+":"+self.cmd_args] = self
+        print(self.cmd+":"+self.cmd_args)
 
     def __del__(self):
         # try:
         logger.debug('deleting pdarray with name {}'.format(self.name))
-        print("Caching ", self.name)
+        if (id_to_args[self.name] in args_to_id.keys()):
+            del args_to_id[id_to_args[self.name]]
+        if (self.name in id_to_args.keys()):
+            del id_to_args[self.name]
         cache_array(self)
 
     # except:
@@ -235,8 +241,13 @@ class pdarray:
         cmd = "binopvs"
         args = "{} {} {} {}". \
             format(op, self.name, dt, NUMBER_FORMAT_STRINGS[dt].format(other))
-        repMsg = generic_msg(cmd=cmd, args=args)
-        return create_pdarray(repMsg)
+        if ((cmd+":"+args) in args_to_id.keys()):
+            return args_to_id[cmd+":"+args]
+        else:
+            arr = pdarray(cmd=cmd, cmd_args=args, mydtype=self.dtype, size=self.size,
+                        ndim=1, shape=self.shape, itemsize=self.itemsize)
+            generic_msg(cmd=cmd, args=args, create_pdarray=True, arr_id=arr.name, my_pdarray=[self, arr])
+        return arr
 
     # reverse binary operators
     # pdarray binop pdarray: taken care of by binop function
@@ -281,7 +292,7 @@ class pdarray:
 
     # overload + for pdarray, other can be {pdarray, int, float}
     def __add__(self, other):
-        if isinstance(other, pdarray) and check_arr(self.dtype, self.size):
+        if check_arr(self.dtype, self.size):
             return binOpWithStore(self, other, uncache_array(self.dtype, self.size), "+")
         return self._binop(other, "+")
 
@@ -290,7 +301,7 @@ class pdarray:
 
     # overload - for pdarray, other can be {pdarray, int, float}
     def __sub__(self, other):
-        if isinstance(other, pdarray) and check_arr(self.dtype, self.size):
+        if check_arr(self.dtype, self.size):
             return binOpWithStore(self, other, uncache_array(self.dtype, self.size), "-")
         return self._binop(other, "-")
 
@@ -303,7 +314,7 @@ class pdarray:
         # print(self.dtype)
         # print(self.size)
         # print(check_arr(self.dtype, self.size))
-        if isinstance(other, pdarray) and check_arr(self.dtype, self.size):
+        if check_arr(self.dtype, self.size):
             # print("Calling mult and store", self.name, ' ', other.name)
             return binOpWithStore(self, other, uncache_array(self.dtype, self.size), "*")
         return self._binop(other, "*")
@@ -313,7 +324,7 @@ class pdarray:
 
     # overload / for pdarray, other can be {pdarray, int, float}
     def __truediv__(self, other):
-        if isinstance(other, pdarray) and check_arr(self.dtype, self.size):
+        if check_arr(self.dtype, self.size):
             return binOpWithStore(self, other, uncache_array(self.dtype, self.size), "/")
         return self._binop(other, "/")
 
@@ -1915,18 +1926,27 @@ def unregister_pdarray_by_name(user_defined_name:str) -> None:
     """
     repMsg = generic_msg(cmd="unregister", args=user_defined_name)
 
-@typechecked
 def binOpWithStore(pda_left: pdarray, pda_right: pdarray, pda_store_name: str, binop: str) -> pdarray:
-    cmd = "binopvvStore"
-    arr = create_pdarray_with_name(pda_store_name, cmd, "", pda_left.dtype, pda_left.size, pda_left.ndim,
-                                   pda_left.shape, pda_left.itemsize)
-    args = "{} {} {} {}". \
-        format(binop, pda_left.name, pda_right.name, arr.name)
-    arr.cmd_args = args
-    generic_msg(cmd=cmd, args=args, my_pdarray=[pda_left,pda_right,arr])
-    return arr
+    if isinstance(pda_right, pdarray):
+        cmd = "binopvvStore"
+        arr = create_pdarray_with_name(pda_store_name, cmd, "", pda_left.dtype, pda_left.size, pda_left.ndim,
+                                       pda_left.shape, pda_left.itemsize)
+        args = "{} {} {} {}". \
+            format(binop, pda_left.name, pda_right.name, arr.name)
+        arr.cmd_args = args
+        generic_msg(cmd=cmd, args=args, my_pdarray=[pda_left,pda_right,arr])
+        return arr
+    else:
+        dt = resolve_scalar_dtype(pda_right)
+        if dt not in DTypes:
+            raise TypeError("Unhandled scalar type: {} ({})".format(pda_right, type(pda_right)))
+        cmd = "binopvsStore"
+        arr = create_pdarray_with_name(pda_store_name, cmd, "", pda_left.dtype, pda_left.size, pda_left.ndim,
+                                       pda_left.shape, pda_left.itemsize)
+        args = "{} {} {} {} {}".format(binop, pda_left.name, dt, NUMBER_FORMAT_STRINGS[dt].format(pda_right), arr.name)
+        generic_msg(cmd=cmd, args=args, create_pdarray=True, arr_id=arr.name, my_pdarray=[pda_left, arr])
+        return arr
 
-@typechecked
 def multAndStore(pda_left: pdarray, pda_right: pdarray, pda_store_name: str) -> pdarray:
     cmd = "binopvvStore"
     arr = create_pdarray_with_name(pda_store_name, cmd, "", pda_left.dtype, pda_left.size, pda_left.ndim, pda_left.shape, pda_left.itemsize)
@@ -1943,7 +1963,13 @@ class RegistrationError(Exception):
 
 
 def cache_array(arr: pdarray):
-    print("Caching ", client_to_server_names[arr.name])
+    # print("name=",arr.name)
+    if arr.name not in client_to_server_names.keys():
+        return;
+    #print("----MAP----")
+    #for (key, value) in client_to_server_names.items():
+    #    print("key=", key, "value=", value)
+    #print("Caching ", client_to_server_names[arr.name])
     cache[arr.dtype][arr.size].add(client_to_server_names[arr.name])
     client_to_server_names.pop(arr.name)
 
@@ -1961,7 +1987,7 @@ def uncache_array(dtype, arr_size):
         return arr
 
 @typechecked
-def create_pdarray_with_name(name: str,cmd: str, cmd_args: str,
+def create_pdarray_with_name(name: str, cmd: str, cmd_args: str,
                                 mydtype: np.dtype, size: int_scalars, ndim: int_scalars, shape: Sequence[int], itemsize: int_scalars):
     arr = pdarray(cmd, cmd_args, mydtype, size, ndim, shape, itemsize)
     client_to_server_names[arr.name]=name

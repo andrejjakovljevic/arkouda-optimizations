@@ -39,7 +39,8 @@ queue_size: int = 10
 
 q = Queue(queue_size)
 client_to_server_names = {}
-
+id_to_args = {}
+args_to_id = {}
 
 # reset settings to default values
 def set_defaults() -> None:
@@ -490,7 +491,7 @@ def shutdown() -> None:
         Raised if the client is not connected to the Arkouda server or
         there is an error in disconnecting from the server
     """
-    global socket, pspStr, connected, verbose
+    global socket, pspStr, id_to_args, connected, verbose
 
     if not connected:
         raise RuntimeError('not connected, cannot shutdown server')
@@ -580,6 +581,7 @@ def generic_msg(cmd: str, args: Union[str, bytes] = None, send_bytes: bool = Fal
         try:
             # Transform the args with client to server names
             args = transform_args(args)
+            print("cmd=", cmd)
             # Send the message
             if send_bytes:
                 repMsg = _send_binary_message(cmd=cmd,
@@ -601,7 +603,7 @@ def generic_msg(cmd: str, args: Union[str, bytes] = None, send_bytes: bool = Fal
                 logger.debug(("created Chapel array with name: {} dtype: {} size: {} ndim: {} shape: {} " +
                               "itemsize: {}").format(name, mydtype, size, ndim, shape, itemsize))
                 client_to_server_names[arr_id] = name
-                print(arr_id,' ',name)
+                print(arr_id, ' ', name)
             return repMsg
 
         except KeyboardInterrupt as e:
@@ -719,6 +721,7 @@ class BufferItem:
         self.dependencies = []
         self.executed = executed
         self.my_pd_array = my_pd_array
+
 
     def __str__(self):
         return "Buffer Item, Cmd={0}, Args={1}, Pdarray_id={2}".format(self.cmd, self.args, self.pdarray_id)

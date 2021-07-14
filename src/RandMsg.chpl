@@ -105,6 +105,86 @@ module RandMsg
         return new MsgTuple(repMsg, MsgType.NORMAL);
     }
 
+    proc randintStoreMsg(cmd: string, payload: string, st: borrowed SymTab) throws
+    {
+        param pn = Reflection.getRoutineName();
+        var repMsg: string; // response message
+        // split request into fields
+        var (lenStr,dtypeStr,aMinStr,aMaxStr,seed, store) = payload.splitMsgToTuple(6);
+        var len = lenStr:int;
+        var dtype = str2dtype(dtypeStr);
+
+        // get store name
+        var res: borrowed GenSymEntry = st.lookup(store);
+
+        // if verbose print action
+        randLogger.debug(getModuleName(),getRoutineName(),getLineNumber(),
+               "cmd: %s len: %i dtype: %s rname: %s aMin: %s: aMax: %s".format(
+                                           cmd,len,dtype2str(dtype),store,aMinStr,aMaxStr));
+
+        select (dtype) {
+            when (DType.Int64) {
+                var aMin = aMinStr:int;
+                var aMax = aMaxStr:int;
+                var t1 = Time.getCurrentTime();
+                var s = toSymEntry(res,int);
+                randLogger.debug(getModuleName(),getRoutineName(),getLineNumber(),
+                                   "alloc time = %i sec".format(Time.getCurrentTime() - t1));
+
+                t1 = Time.getCurrentTime();
+                fillInt(s.a, aMin, aMax, seed);
+                randLogger.debug(getModuleName(),getRoutineName(),getLineNumber(),
+                                  "compute time = %i sec".format(Time.getCurrentTime() - t1));
+            }
+            when (DType.UInt8) {
+                var aMin = aMinStr:int;
+                var aMax = aMaxStr:int;
+                var t1 = Time.getCurrentTime();
+                var s = toSymEntry(res, uint(8));
+                randLogger.debug(getModuleName(),getRoutineName(),getLineNumber(),
+                                     "alloc time = %i sec".format(Time.getCurrentTime() - t1));
+
+                t1 = Time.getCurrentTime();
+                fillUInt(s.a, aMin, aMax, seed);
+                randLogger.debug(getModuleName(),getRoutineName(),getLineNumber(),
+                                        "compute time = %i".format(Time.getCurrentTime() - t1));
+            }
+            when (DType.Float64) {
+                var aMin = aMinStr:real;
+                var aMax = aMaxStr:real;
+                var t1 = Time.getCurrentTime();
+                var s = toSymEntry(res,real);
+                randLogger.debug(getModuleName(),getRoutineName(),getLineNumber(),
+                                         "alloc time = %i sec".format(Time.getCurrentTime() - t1));
+
+                t1 = Time.getCurrentTime();
+                fillReal(s.a, aMin, aMax, seed);
+                randLogger.debug(getModuleName(),getRoutineName(),getLineNumber(),
+                          "compute time = %i sec".format(Time.getCurrentTime() - t1));
+            }
+            when (DType.Bool) {
+                var t1 = Time.getCurrentTime();
+                var s = toSymEntry(res,bool);
+                randLogger.debug(getModuleName(),getRoutineName(),getLineNumber(),
+                                  "alloc time = %i sec".format(Time.getCurrentTime() - t1));
+
+                t1 = Time.getCurrentTime();
+                fillBool(s.a, seed);
+                randLogger.debug(getModuleName(),getRoutineName(),getLineNumber(),
+                                "compute time = %i sec".format(Time.getCurrentTime() - t1));
+            }
+            otherwise {
+                var errorMsg = notImplementedError(pn,dtype);
+                randLogger.error(getModuleName(),getRoutineName(),getLineNumber(),errorMsg);
+                return new MsgTuple(errorMsg, MsgType.ERROR);
+            }
+        }
+
+        repMsg = "updated " + st.attrib(store);
+        randLogger.debug(getModuleName(),getRoutineName(),getLineNumber(),repMsg);
+        return new MsgTuple(repMsg, MsgType.NORMAL);
+    }
+
     proc randomNormalMsg(cmd: string, payload: string, st: borrowed SymTab): MsgTuple throws {
         var pn = Reflection.getRoutineName();
         var (lenStr, seed) = payload.splitMsgToTuple(2);

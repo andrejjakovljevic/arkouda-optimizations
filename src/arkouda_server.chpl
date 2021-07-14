@@ -294,7 +294,7 @@ proc main() {
              */
             var binaryRepMsg: bytes;
             var repTuple: MsgTuple;
-            num = num +1;
+            //num = num +1;
             select cmd
             {
                 when "array"             {repTuple = arrayMsg(cmd, payload, st);}
@@ -325,6 +325,7 @@ proc main() {
                 when "binopvv"           {repTuple = binopvvMsg(cmd, args, st);}
                 when "binopvvStore"      {repTuple = binopvvStoreMsg(cmd, args, st);}
                 when "binopvs"           {repTuple = binopvsMsg(cmd, args, st);}
+                when "binopvsStore"      {repTuple = binopvsStoreMsg(cmd, args, st);}
                 when "binopsv"           {repTuple = binopsvMsg(cmd, args, st);}
                 when "opeqvv"            {repTuple = opeqvvMsg(cmd, args, st);}
                 when "opeqvs"            {repTuple = opeqvsMsg(cmd, args, st);}
@@ -341,6 +342,7 @@ proc main() {
                 when "arange"            {repTuple = arangeMsg(cmd, args, st);}
                 when "linspace"          {repTuple = linspaceMsg(cmd, args, st);}
                 when "randint"           {repTuple = randintMsg(cmd, args, st);}
+                when "randintStore"      {repTuple = randintStoreMsg(cmd, args, st);}
                 when "randomNormal"      {repTuple = randomNormalMsg(cmd, args, st);}
                 when "randomStrings"     {repTuple = randomStringsMsg(cmd, args, st);}
                 when "histogram"         {repTuple = histogramMsg(cmd, args, st);}

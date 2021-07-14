@@ -1672,7 +1672,7 @@ module OperatorMsg
         return new MsgTuple(repMsg, MsgType.NORMAL);
     }
 
-        proc binopvvStoreMsg(cmd: string, payload: string, st: borrowed SymTab): MsgTuple throws {
+    proc binopvvStoreMsg(cmd: string, payload: string, st: borrowed SymTab): MsgTuple throws {
         param pn = Reflection.getRoutineName();
         var repMsg: string; // response message
 
@@ -1703,6 +1703,9 @@ module OperatorMsg
                     when "*" {
                         s.a = l.a * r.a;
                     }
+                    when "/" {
+                        s.a = l.a / r.a;
+                    }
                     otherwise {
                         var errorMsg = notImplementedError(pn,left.dtype,op,right.dtype);
                         omLogger.error(getModuleName(),getRoutineName(),getLineNumber(),errorMsg);
@@ -1722,4 +1725,49 @@ module OperatorMsg
         omLogger.debug(getModuleName(),getRoutineName(),getLineNumber(),repMsg);
         return new MsgTuple(repMsg, MsgType.NORMAL);
     }
+
+    proc binopvsStoreMsg(cmd: string, payload: string, st: borrowed SymTab): MsgTuple throws {
+        param pn = Reflection.getRoutineName();
+        var repMsg: string = ""; // response message
+
+        // split request into fields
+        var (op, aname, dtypeStr, value, store) = payload.splitMsgToTuple(5);
+
+        var dtype = str2dtype(dtypeStr);
+        var left: borrowed GenSymEntry = st.lookup(aname);
+        var res: borrowed GenSymEntry = st.lookup(store);
+
+        omLogger.debug(getModuleName(),getRoutineName(),getLineNumber(),
+                           "op: %s dtype: %t pdarray: %t scalar: %t".format(
+                                                     op,dtype,st.attrib(aname),value));
+
+        select (left.dtype, dtype) {
+            when (DType.Int64, DType.Int64) {
+                var l = toSymEntry(left,int);
+                var s = toSymEntry(res,int);
+                var val = try! value:int;
+                select op
+                {
+                    when "+" {
+                        s.a = l.a + val;
+                    }
+                    when "-" {
+                        s.a = l.a - val;
+                    }
+                    when "*" {
+                        s.a = l.a * val;
+                    }
+                    otherwise {
+                        var errorMsg = notImplementedError(pn,left.dtype,op,dtype);
+                        omLogger.error(getModuleName(),getRoutineName(),getLineNumber(),errorMsg);
+                        return new MsgTuple(errorMsg, MsgType.ERROR);
+                    }
+                }
+            }
+        }
+        repMsg = "updated %s".format(st.attrib(store));
+        omLogger.debug(getModuleName(),getRoutineName(),getLineNumber(),repMsg);
+        return new MsgTuple(repMsg, MsgType.NORMAL);
+    }
+
 }
