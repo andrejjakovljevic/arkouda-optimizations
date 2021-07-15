@@ -136,10 +136,10 @@ def betweenness_centrality_1d():
     Implements the triangle count algorithm
     treating the input adjacency matrix as a 1d array.
     """
-    ak.connect(connect_url='tcp://MacBook-Pro.local:5555')
+    #ak.connect(connect_url='tcp://MacBook-Pro.local:5555')
 
     # GrB_Matrix A
-    A = ak.randint(0, 10, 10)
+    A = ak.randint(0, 10, 50)
     # GrB_Index s
     s = 2
 
@@ -182,33 +182,38 @@ def betweenness_centrality_1d():
     # GrB reduce(&sum , GrB NULL, GrB PLUS MONOID INT32 , q , GrB NULL ) ;
     summation = ak.sum(q)
     # ++d ;
-    d += 1
+    d += 10000
 
     # GrB Vector t 1 ; GrB Vector new(&t1 , GrB FP32 , n ) ; for t1-t4
     t1 = ak.zeros(n, ak.int64)
     t2 = ak.zeros(n, ak.int64)
     t3 = ak.zeros(n, ak.int64)
     t4 = ak.zeros(n, ak.int64)
-
+    s=0
     for i in range(d - 1, 0, -1):
         # GrB assign ( t1 , GrB NULL, GrB NULL, 1 . 0 f , GrB ALL , n , GrB NULL ) ;
-        t1 = ak.ones(n, ak.float64)
+        t1 = ak.ones(n, ak.int64)
+        s+=t1.sum()
         # GrB eWiseAdd ( t1 , GrB NULL, GrB NULL, GrB PLUS MONOID FP32, t1 , ∗ delta , GrB NULL ) ;
         t1 = t1 + delta
         # G rB e x t r ac t ( t2 , GrB NULL, GrB NULL, sigma , GrB ALL , n , i , GrB DESC T0 ) ;
-        t2 = sigma[i]
+        t2 = sigma[i%A.size]
         # GrB eWiseMult ( t2 , GrB NULL, GrB NULL, GrB DIV FP32 , t1 , t2 , GrB NULL ) ;
-        t2 = t1 / t2
+        t2 = t1 // t2
+        s+=t2.sum()
         # GrB mxv ( t3 , GrB NULL, GrB NULL, GrB PLUS TIMES SEMIRING FP32 , A, t2 , GrB NULL ) ;
         t3 = A * t2
+        s += t3.sum()
         # G rB e x t r ac t ( t4 , GrB NULL, GrB NULL, sigma , GrB ALL , n , i −1,GrB DESC T0 ) ;
-        t4 = sigma[i - 1]
+        t4 = sigma[(i - 1) % A.size]
         # GrB eWiseMult ( t4 , GrB NULL, GrB NULL, GrB TIMES FP32 , t4 , t3 , GrB NULL ) ;
-        t4 = sigma[i - 1] * t3
+        t4 = sigma[(i - 1) % A.size] * t3
+        s += t4.sum()
         # GrB eWiseAdd (∗ d el t a , GrB NULL, GrB NULL, GrB PLUS FP32 , ∗ d el t a , t4 , GrB NULL ) ;
         delta = delta + t4
+        s += delta.sum()
 
-    ak.shutdown()
+    #ak.shutdown()
 
 
 def betweenness_centrality():
@@ -228,7 +233,7 @@ x = np.array([[0, 0, 0, 0],
               [0, 1, 1, 0]])
 # print(triangle_count_numpy(x, 2, 2, 2, False))
 
-ak.connect(connect_url='tcp://MacBook-Pro.local:5555')
+ak.connect(connect_url='tcp://andrej-X556UQ:5555')
 # x = ak.randint(0, 10, 100)
 # y = ak.randint(0, 10, 100)
 # z = x + y
@@ -236,7 +241,7 @@ ak.connect(connect_url='tcp://MacBook-Pro.local:5555')
 # y = ak.randint(0, 10, 100)
 # print(y.client_name)
 start = time.perf_counter()
-print(triangle_count_scalar(x, 2, 2, 2))
+print(betweenness_centrality_1d())
 end = time.perf_counter()
 print(f"triangle count took {end - start:0.9f} seconds")
 
@@ -254,5 +259,5 @@ print(f"triangle count took {end - start:0.9f} seconds")
 # E = ak.randint(0, 10, 10)
 # F = ak.randint(0, 10, 10)
 # x = ((A+B)*(C+D)) + (E*F)
-ak.disconnect()
-# ak.shutdown()
+#ak.disconnect()
+ak.shutdown()

@@ -89,21 +89,17 @@ def create_blocks_scalar(A: np.ndarray, row_size, col_size):
     count = 0
     for r in range(num_rows):
         for c in range(num_cols):
-            M = ak.randint(1,100,1)
+            M = ak.randint(0, 100, 1)
             count = count + 2
             out.append(M)
 
     return out
 
-
-x = np.array([[0, 0, 0, 0],
-              [1, 0, 0, 0],
-              [1, 1, 0, 0],
-              [0, 1, 1, 0]])
+x = array = np.random.randint(2, size=(32, 32))
 
 ak.connect(connect_url='tcp://andrej-X556UQ:5555')
 start = time.perf_counter()
-print(triangle_count_scalar(x, 2, 2, 2))
+print(triangle_count_scalar(x, 16, 16, 16))
 # print(triangle_count_numpy(x, 2, 2, 2, False))
 end = time.perf_counter()
 print(f"triangle count took {end - start:0.9f} seconds")

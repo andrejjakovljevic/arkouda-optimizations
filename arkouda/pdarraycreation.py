@@ -3,13 +3,14 @@ import pandas as pd  # type: ignore
 import struct
 from typing import cast, Iterable, Optional, Union
 from typeguard import typechecked
-from arkouda.client import generic_msg
+from arkouda.client import generic_msg, id_to_args, args_to_id
 from arkouda.dtypes import structDtypeCodes, NUMBER_FORMAT_STRINGS, float64, int64, \
     DTypes, isSupportedInt, isSupportedNumber, NumericDTypes, SeriesDTypes, \
     int_scalars, numeric_scalars
 from arkouda.dtypes import dtype as akdtype
 from arkouda.pdarrayclass import pdarray, create_pdarray, check_arr, uncache_array, create_pdarray_with_name
 from arkouda.strings import Strings
+import weakref
 
 __all__ = ["array", "zeros", "ones", "zeros_like", "ones_like",
            "arange", "linspace", "randint", "uniform", "standard_normal",
@@ -264,11 +265,9 @@ def zeros(size: int_scalars, dtype: type = np.float64) -> pdarray:
 
     generic_msg(cmd='create', args='{} {}'. \
                 format(cast(np.dtype, dtype).name, size),
-                create_pdarray=True, buff_emptying=False, arr_id=arr.name)
+                create_pdarray=True, buff_emptying=False, arr_id=arr.name, my_pdarray=[arr])
 
     return arr
-
-    return create_pdarray(repMsg)
 
 
 def ones(size: int_scalars, dtype: type = float64) -> pdarray:
@@ -315,11 +314,14 @@ def ones(size: int_scalars, dtype: type = float64) -> pdarray:
     # check dtype for error
     if cast(np.dtype, dtype).name not in NumericDTypes:
         raise TypeError("unsupported dtype {}".format(dtype))
-    repMsg = generic_msg(cmd="create", args="{} {}".format(
-        cast(np.dtype, dtype).name, size))
-    a = create_pdarray(repMsg)
-    a.fill(1)
-    return a
+    arr = pdarray(cmd='create', cmd_args='{} {}'.format(cast(np.dtype, dtype).name, size), mydtype=dtype.name,
+                  size=size, ndim=1, shape=[size], itemsize=dtype.itemsize)
+
+    generic_msg(cmd='create', args='{} {}'. \
+                format(cast(np.dtype, dtype).name, size),
+                create_pdarray=True, return_value_needed=True, buff_emptying=False, arr_id=arr.name, my_pdarray=[arr])
+    arr.fill(1)
+    return arr
 
 
 @typechecked
@@ -489,17 +491,26 @@ def arange(*args) -> pdarray:
     if stride == 0:
         raise ZeroDivisionError("division by zero")
 
+    size = (stop - start)//stride
+
     if isSupportedInt(start) and isSupportedInt(stop) and isSupportedInt(stride):
         if stride < 0:
             stop = stop + 2
-        # repMsg = generic_msg(cmd='arange', args="{} {} {}".format(start, stop, stride))
-        arr = pdarray(cmd='arange', cmd_args='{} {} {}'. \
+        if check_arr(int64, size):
+            cmd = 'arangeStore'
+            name = uncache_array(int64, size)
+            arr = create_pdarray_with_name(name, cmd, "", int64, size, 1, [size], int64.itemsize)
+            args = '{} {} {} {}'.format(start, stop, stride, name)
+            arr.cmd_args = args
+            generic_msg(cmd = cmd, args = args, arr_id = arr.name, my_pdarray=[arr])
+        else:
+            arr = pdarray(cmd='arange', cmd_args='{} {} {}'. \
                       format(start, stop, stride),
                       mydtype=int64, size=(stop-start)//stride, ndim=1, shape=[(stop-start)//stride], itemsize=int64.itemsize)
 
-        generic_msg(cmd='arange', args='{} {} {}'. \
+            generic_msg(cmd='arange', args='{} {} {}'. \
                     format(start, stop, stride),
-                    create_pdarray=True, buff_emptying=False, arr_id=arr.name)
+                    create_pdarray=True, buff_emptying=False, arr_id=arr.name, my_pdarray=[arr])
 
         return arr
         # return create_pdarray(repMsg)

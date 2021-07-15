@@ -40,7 +40,7 @@ queue_size: int = 10
 q = Queue(queue_size)
 client_to_server_names = {}
 id_to_args = {}
-args_to_id = {}
+args_to_id = {str: {}}
 
 # reset settings to default values
 def set_defaults() -> None:
@@ -581,7 +581,8 @@ def generic_msg(cmd: str, args: Union[str, bytes] = None, send_bytes: bool = Fal
         try:
             # Transform the args with client to server names
             args = transform_args(args)
-            print("cmd=", cmd)
+            # print("cmd=", cmd)
+            # print("args=",args)
             # Send the message
             if send_bytes:
                 repMsg = _send_binary_message(cmd=cmd,
@@ -603,7 +604,7 @@ def generic_msg(cmd: str, args: Union[str, bytes] = None, send_bytes: bool = Fal
                 logger.debug(("created Chapel array with name: {} dtype: {} size: {} ndim: {} shape: {} " +
                               "itemsize: {}").format(name, mydtype, size, ndim, shape, itemsize))
                 client_to_server_names[arr_id] = name
-                print(arr_id, ' ', name)
+                # print(arr_id, ' ', name)
             return repMsg
 
         except KeyboardInterrupt as e:
@@ -806,8 +807,7 @@ def buff_empty():
     q.get().execute()
     if not q.empty():
         buff_empty()
-    else:
-        print("New Queue Size is:", q.qsize())
+        # print("New Queue Size is:", q.qsize())
 
 
 def buff_empty_partial(size):

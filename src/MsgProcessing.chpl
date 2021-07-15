@@ -289,6 +289,36 @@ module MsgProcessing
         return new MsgTuple(repMsg, MsgType.NORMAL);
     }            
 
+    proc arangeStoreMsg(cmd: string, payload: string, st: borrowed SymTab): MsgTuple throws {
+        var repMsg: string; // response message
+        var (startstr, stopstr, stridestr, store) = payload.splitMsgToTuple(4);
+        var start = try! startstr:int;
+        var stop = try! stopstr:int;
+        var stride = try! stridestr:int;
+        var len = (stop - start + stride - 1) / stride;
+        // get store name
+        var res: borrowed GenSymEntry = st.lookup(store);
+
+       mpLogger.debug(getModuleName(),getRoutineName(),getLineNumber(),
+                       "cmd: %s start: %i stop: %i stride: %i store: %s len: %i".format(
+                        cmd, start, stop, stride, len));
+
+        var s = toSymEntry(res,int);
+        var t1 = Time.getCurrentTime();
+        ref sa = s.a;
+        ref sad = s.aD;
+        forall (si, i) in zip(sa,sad) {
+            si = start + (i * stride);
+        }
+
+        mpLogger.debug(getModuleName(),getRoutineName(),getLineNumber(),
+                                      "compute time = %i sec".format(Time.getCurrentTime() - t1));
+
+        repMsg = "updated " + st.attrib(store);
+        mpLogger.debug(getModuleName(),getRoutineName(),getLineNumber(),repMsg);
+        return new MsgTuple(repMsg, MsgType.NORMAL);
+    }
+
     /* 
     Creates a sym entry with distributed array adhering to the Msg parameters (start, stop, len)
 

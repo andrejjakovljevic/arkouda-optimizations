@@ -1706,6 +1706,12 @@ module OperatorMsg
                     when "/" {
                         s.a = l.a / r.a;
                     }
+                    when "//" {
+                        ref sa = s.a;
+                        ref la = l.a;
+                        ref ra = r.a;
+                        [(si,li,ri) in zip(sa,la,ra)] si = if ri != 0 then li/ri else 0;
+                    }
                     otherwise {
                         var errorMsg = notImplementedError(pn,left.dtype,op,right.dtype);
                         omLogger.error(getModuleName(),getRoutineName(),getLineNumber(),errorMsg);
@@ -1756,6 +1762,11 @@ module OperatorMsg
                     }
                     when "*" {
                         s.a = l.a * val;
+                    }
+                    when "//" {
+                        ref sa = s.a;
+                        ref la = l.a;
+                        [(si,li) in zip(sa,la)] si = if val != 0 then li/val else 0;
                     }
                     otherwise {
                         var errorMsg = notImplementedError(pn,left.dtype,op,dtype);

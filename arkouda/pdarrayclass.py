@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 from typing import cast, List, Sequence
 from typeguard import typechecked
 import json, struct
@@ -7,13 +8,14 @@ from arkouda.client import generic_msg, client_to_server_names, id_to_args, args
 from arkouda.dtypes import dtype, DTypes, resolve_scalar_dtype, \
     structDtypeCodes, translate_np_dtype, NUMBER_FORMAT_STRINGS, \
     int_scalars, numeric_scalars, numpy_scalars, int64
-from arkouda.dtypes import int64 as akint64
+from arkouda.dtypes import int64 as akint64, float64 as akfloat64
 from arkouda.dtypes import str_ as akstr_
 from arkouda.dtypes import bool as npbool
 from arkouda.logger import getArkoudaLogger
 from collections import defaultdict
 from arkouda.infoclass import list_registry, information, pretty_print_information
 import builtins
+import weakref
 
 __all__ = ["pdarray", "clear", "any", "all", "is_sorted", "sum", "prod",
            "min", "max", "argmin", "argmax", "mean", "var", "std", "mink",
@@ -27,7 +29,8 @@ array_count = 1
 # Default dictionary so you can access cached pdarrays as
 # cache[type of stored value][size of pdarray]
 cache = dict()
-cache[int64] = defaultdict(set)
+cache[akint64] = defaultdict(set)
+cache[akfloat64] = defaultdict(set)
 
 
 @typechecked
@@ -126,17 +129,26 @@ class pdarray:
         self.ndim = ndim
         self.shape = shape
         self.itemsize = itemsize
-        id_to_args[self.name] = self.cmd + ":" + self.cmd_args
-        args_to_id[self.cmd+":"+self.cmd_args] = self
-        print(self.cmd+":"+self.cmd_args)
+        if (cmd_args != ''):
+            id_to_args[self.name] = self.cmd + " : " + self.cmd_args
+            # make weak ref
+            if (self.cmd+" : "+self.cmd_args not in args_to_id.keys()):
+                args_to_id[self.cmd+" : "+self.cmd_args] = {}
+            args_to_id[self.cmd+" : "+self.cmd_args][self.name] = weakref.ref(self)
+        else:
+            if (self.cmd+" : "+self.cmd_args not in args_to_id.keys()):
+                args_to_id[self.cmd+" : "+self.cmd_args] = {}
+        # print(self.cmd+" : "+self.cmd_args)
 
     def __del__(self):
         # try:
         logger.debug('deleting pdarray with name {}'.format(self.name))
-        if (id_to_args[self.name] in args_to_id.keys()):
-            del args_to_id[id_to_args[self.name]]
+        # delete all things that are in same arguments
+        if (self.name in id_to_args and id_to_args[self.name] in args_to_id.keys()):
+            del args_to_id[id_to_args[self.name]][self.name]
         if (self.name in id_to_args.keys()):
             del id_to_args[self.name]
+        #del client_to_server_names[self.name]
         cache_array(self)
 
     # except:
@@ -241,12 +253,9 @@ class pdarray:
         cmd = "binopvs"
         args = "{} {} {} {}". \
             format(op, self.name, dt, NUMBER_FORMAT_STRINGS[dt].format(other))
-        if ((cmd+":"+args) in args_to_id.keys()):
-            return args_to_id[cmd+":"+args]
-        else:
-            arr = pdarray(cmd=cmd, cmd_args=args, mydtype=self.dtype, size=self.size,
-                        ndim=1, shape=self.shape, itemsize=self.itemsize)
-            generic_msg(cmd=cmd, args=args, create_pdarray=True, arr_id=arr.name, my_pdarray=[self, arr])
+        arr = pdarray(cmd=cmd, cmd_args=args, mydtype=self.dtype, size=self.size,
+                    ndim=1, shape=self.shape, itemsize=self.itemsize)
+        generic_msg(cmd=cmd, args=args, create_pdarray=True, arr_id=arr.name, my_pdarray=[self, arr])
         return arr
 
     # reverse binary operators
@@ -275,6 +284,7 @@ class pdarray:
             Raised if other is not a pdarray or the pdarray.dtype is not
             a supported dtype
         """
+        return self._binop(other, op)
 
         if op not in self.BinOps:
             raise ValueError("bad operator {}".format(op))
@@ -333,6 +343,8 @@ class pdarray:
 
     # overload // for pdarray, other can be {pdarray, int, float}
     def __floordiv__(self, other):
+        if check_arr(self.dtype, self.size):
+            return binOpWithStore(self, other, uncache_array(self.dtype, self.size), "//")
         return self._binop(other, "//")
 
     def __rfloordiv__(self, other):
@@ -499,7 +511,7 @@ class pdarray:
                 # Interpret negative key as offset from end of array
                 key += self.size
             if (key >= 0 and key < self.size):
-                repMsg = generic_msg(cmd="[int]", args="{} {}".format(self.name, key))
+                repMsg = generic_msg(cmd="[int]", args="{} {}".format(self.name, key), return_value_needed=True, arr_id=self.name, my_pdarray=[self])
                 fields = repMsg.split()
                 # value = fields[2]
                 return parse_single_value(' '.join(fields[1:]))
@@ -1934,7 +1946,12 @@ def binOpWithStore(pda_left: pdarray, pda_right: pdarray, pda_store_name: str, b
         args = "{} {} {} {}". \
             format(binop, pda_left.name, pda_right.name, arr.name)
         arr.cmd_args = args
-        generic_msg(cmd=cmd, args=args, my_pdarray=[pda_left,pda_right,arr])
+        if (arr.cmd + " : " + arr.cmd_args not in args_to_id.keys()):
+            args_to_id[arr.cmd + " : " + arr.cmd_args] = {}
+        id_to_args[arr.name] = arr.cmd + " : " + arr.cmd_args
+        # make weak ref
+        args_to_id[arr.cmd + " : " + arr.cmd_args][arr.name] = weakref.ref(arr)
+        generic_msg(cmd=cmd, args=args, my_pdarray=[pda_left, pda_right, arr])
         return arr
     else:
         dt = resolve_scalar_dtype(pda_right)
@@ -1944,6 +1961,12 @@ def binOpWithStore(pda_left: pdarray, pda_right: pdarray, pda_store_name: str, b
         arr = create_pdarray_with_name(pda_store_name, cmd, "", pda_left.dtype, pda_left.size, pda_left.ndim,
                                        pda_left.shape, pda_left.itemsize)
         args = "{} {} {} {} {}".format(binop, pda_left.name, dt, NUMBER_FORMAT_STRINGS[dt].format(pda_right), arr.name)
+        arr.cmd_args = args
+        id_to_args[arr.name] = arr.cmd + " : " + arr.cmd_args
+        # make weak ref
+        if (arr.cmd + " : " + arr.cmd_args not in args_to_id.keys()):
+            args_to_id[arr.cmd + " : " + arr.cmd_args] = {}
+        args_to_id[arr.cmd + " : " + arr.cmd_args][arr.name] = weakref.ref(arr)
         generic_msg(cmd=cmd, args=args, create_pdarray=True, arr_id=arr.name, my_pdarray=[pda_left, arr])
         return arr
 
@@ -1953,7 +1976,10 @@ def multAndStore(pda_left: pdarray, pda_right: pdarray, pda_store_name: str) -> 
     args = "{} {} {} {}". \
         format("*", pda_left.name, pda_right.name, arr.name)
     arr.cmd_args = args
-    generic_msg(cmd=cmd, args=args, my_pdarray=[pda_left,pda_right,arr])
+    id_to_args[arr.name] = arr.cmd + " : " + arr.cmd_args
+    # make weak ref
+    args_to_id[arr.cmd + " : " + arr.cmd_args][arr.name] = weakref.ref(arr)
+    generic_msg(cmd=cmd, args=args, my_pdarray=[pda_left, pda_right, arr])
     return arr
 
 
@@ -1969,7 +1995,7 @@ def cache_array(arr: pdarray):
     #print("----MAP----")
     #for (key, value) in client_to_server_names.items():
     #    print("key=", key, "value=", value)
-    #print("Caching ", client_to_server_names[arr.name])
+    # print("Caching ", client_to_server_names[arr.name])
     cache[arr.dtype][arr.size].add(client_to_server_names[arr.name])
     client_to_server_names.pop(arr.name)
 
@@ -1982,8 +2008,8 @@ def check_arr(dtype, arr_size):
 def uncache_array(dtype, arr_size):
     if check_arr(dtype, arr_size):
         arr = cache[dtype][arr_size].pop()
-        print("Uncaching ", arr)
-        print("New cache length ", len(cache[dtype][arr_size]))
+        # print("Uncaching ", arr)
+        # print("New cache length ", len(cache[dtype][arr_size]))
         return arr
 
 @typechecked
@@ -1991,5 +2017,5 @@ def create_pdarray_with_name(name: str, cmd: str, cmd_args: str,
                                 mydtype: np.dtype, size: int_scalars, ndim: int_scalars, shape: Sequence[int], itemsize: int_scalars):
     arr = pdarray(cmd, cmd_args, mydtype, size, ndim, shape, itemsize)
     client_to_server_names[arr.name]=name
-    print("create with name",arr.name,name)
+    # print("create with name",arr.name,name)
     return arr

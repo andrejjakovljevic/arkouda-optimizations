@@ -340,6 +340,7 @@ proc main() {
                 when "segmentedReduction"{repTuple = segmentedReductionMsg(cmd, args, st);}
                 when "broadcast"         {repTuple = broadcastMsg(cmd, args, st);}
                 when "arange"            {repTuple = arangeMsg(cmd, args, st);}
+                when "arangeStore"       {repTuple = arangeStoreMsg(cmd, args, st);}
                 when "linspace"          {repTuple = linspaceMsg(cmd, args, st);}
                 when "randint"           {repTuple = randintMsg(cmd, args, st);}
                 when "randintStore"      {repTuple = randintStoreMsg(cmd, args, st);}
