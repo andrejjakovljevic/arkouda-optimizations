@@ -255,10 +255,28 @@ def zeros(size: int_scalars, dtype: type = np.float64) -> pdarray:
     if not np.isscalar(size):
         raise TypeError("size must be a scalar, not {}". \
                         format(size.__class__.__name__))
+
     dtype = akdtype(dtype)  # normalize dtype
     # check dtype for error
     if cast(np.dtype, dtype).name not in NumericDTypes:
         raise TypeError("unsupported dtype {}".format(dtype))
+
+    if check_arr(dtype, size):
+        cmd = "zerosStore"
+        name = uncache_array(dtype, size)
+
+        arr = create_pdarray_with_name(name, cmd, "", dtype, size, 1,
+                                       [size], dtype.itemsize)
+
+        args='{} {} {}'. \
+                format(cast(np.dtype, dtype).name, size, arr.name)
+
+        arr.cmd_args = args
+
+        generic_msg(cmd=cmd, args=args, arr_id=arr.name, my_pdarray=[arr])
+
+        return arr
+
     # repMsg = generic_msg(cmd="create", args="{} {}".format(cast(np.dtype, dtype).name, size))
 
     arr = pdarray(cmd='create', cmd_args='{} {}'.format(cast(np.dtype, dtype).name, size),  mydtype=dtype.name, size=size, ndim=1, shape=[size], itemsize=dtype.itemsize)
@@ -651,7 +669,7 @@ def randint(low: numeric_scalars, high: numeric_scalars,
         arr = create_pdarray_with_name(name, cmd, "", dtype, size, 1,
                                        [size], dtype.itemsize)
         args = '{} {} {} {} {} {}'. \
-            format(sizestr, dtype.name, lowstr, highstr, seed, name)
+            format(sizestr, dtype.name, lowstr, highstr, seed, arr.name)
         arr.cmd_args = args
         generic_msg(cmd=cmd, args=args, arr_id=arr.name, my_pdarray=[arr])
 

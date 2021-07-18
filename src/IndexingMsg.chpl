@@ -117,6 +117,61 @@ module IndexingMsg
         }
     }
 
+    proc sliceIndexStoreMsg(cmd: string, payload: string, st: borrowed SymTab): MsgTuple throws {
+        param pn = Reflection.getRoutineName();
+        var repMsg: string; // response message
+        var (name, startStr, stopStr, strideStr, store)
+              = payload.splitMsgToTuple(5); // split request into fields
+        var start = try! startStr:int;
+        var stop = try! stopStr:int;
+        var stride = try! strideStr:int;
+        var slice: range(stridable=true);
+
+        // convert python slice to chapel slice
+        // backwards iteration with negative stride
+        if  (start > stop) & (stride < 0) {slice = (stop+1)..start by stride;}
+        // forward iteration with positive stride
+        else if (start <= stop) & (stride > 0) {slice = start..(stop-1) by stride;}
+        // BAD FORM start < stop and stride is negative
+        else {slice = 1..0;}
+
+        var gEnt: borrowed GenSymEntry = st.lookup(name);
+        var res: borrowed GenSymEntry = st.lookup(store);
+        imLogger.debug(getModuleName(),getRoutineName(),getLineNumber(),
+            "cmd: %s pdarray to slice: %s start: %i stop: %i stride: %i slice: %t old name: %s".format(
+                       cmd, st.attrib(name), start, stop, stride, slice, store));
+
+        proc sliceHelper(type t) throws {
+            var e = toSymEntry(gEnt,t);
+            var a = toSymEntry(res,t);
+            ref ea = e.a;
+            ref aa = a.a;
+            forall (elt,j) in zip(aa, slice) with (var agg = newSrcAggregator(t)) {
+              agg.copy(elt,ea[j]);
+            }
+            repMsg = "updated " + st.attrib(store);
+            imLogger.debug(getModuleName(),getRoutineName(),getLineNumber(),repMsg);
+            return repMsg;
+        }
+
+        select(gEnt.dtype) {
+            when (DType.Int64) {
+                return new MsgTuple(sliceHelper(int), MsgType.NORMAL);
+            }
+            when (DType.Float64) {
+                return new MsgTuple(sliceHelper(real), MsgType.NORMAL);
+            }
+            when (DType.Bool) {
+                return new MsgTuple(sliceHelper(bool), MsgType.NORMAL);
+            }
+            otherwise {
+                var errorMsg = notImplementedError(pn,dtype2str(gEnt.dtype));
+                imLogger.error(getModuleName(),getRoutineName(),getLineNumber(),errorMsg);
+                return new MsgTuple(errorMsg,MsgType.ERROR);
+            }
+        }
+    }
+
     /* pdarrayIndex "a[pdarray]" response to __getitem__(pdarray) */
     proc pdarrayIndexMsg(cmd: string, payload: string, st: borrowed SymTab): MsgTuple throws {
         param pn = Reflection.getRoutineName();

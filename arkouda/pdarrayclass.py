@@ -31,7 +31,7 @@ array_count = 1
 cache = dict()
 cache[akint64] = defaultdict(set)
 cache[akfloat64] = defaultdict(set)
-
+names_to_weak_ref = {}
 
 @typechecked
 def parse_single_value(msg: str) -> object:
@@ -129,26 +129,69 @@ class pdarray:
         self.ndim = ndim
         self.shape = shape
         self.itemsize = itemsize
+        names_to_weak_ref[self.name] = weakref.ref(self)
         if (cmd_args != ''):
-            id_to_args[self.name] = self.cmd + " : " + self.cmd_args
-            # make weak ref
-            if (self.cmd+" : "+self.cmd_args not in args_to_id.keys()):
-                args_to_id[self.cmd+" : "+self.cmd_args] = {}
-            args_to_id[self.cmd+" : "+self.cmd_args][self.name] = weakref.ref(self)
-        else:
-            if (self.cmd+" : "+self.cmd_args not in args_to_id.keys()):
-                args_to_id[self.cmd+" : "+self.cmd_args] = {}
-        # print(self.cmd+" : "+self.cmd_args)
+            if (cmd=="binopvv"):
+                argss = cmd_args.split(' ')
+                op = argss[0]
+                thing1 = argss[1]
+                thing2 = argss[2]
+                # print('things:'+op+":"+thing1+":"+thing2)
+                args_to_id[op+":"+thing1+":"+thing2] = weakref.ref(self)
+                if (self.name not in id_to_args):
+                    id_to_args[self.name] = []
+                id_to_args[self.name].append(op+":"+thing1+":"+thing2)
+                if (op=="+" or op=="*"):
+                    args_to_id[op+":"+thing2+":"+thing1] = weakref.ref(self)
+                    id_to_args[self.name].append(op + ":" + thing2 + ":" + thing1)
+            elif (cmd=="binopvs"):
+                argss = cmd_args.split(' ')
+                op = argss[0]
+                thing1 = argss[1]
+                thing2 = argss[3]
+                # print('things:'+op + ":" + thing1 + ":" + thing2)
+                args_to_id[op+":"+thing1+":"+thing2] = weakref.ref(self)
+                if (self.name not in id_to_args):
+                    id_to_args[self.name] = []
+                id_to_args[self.name].append(op+":"+thing1+":"+thing2)
+                if (op=="+" or op=="*"):
+                    args_to_id[op+":"+thing2+":"+thing1] = weakref.ref(self)
+                    id_to_args[self.name].append(op + ":" + thing2 + ":" + thing1)
 
     def __del__(self):
         # try:
         logger.debug('deleting pdarray with name {}'.format(self.name))
         # delete all things that are in same arguments
-        if (self.name in id_to_args and id_to_args[self.name] in args_to_id.keys()):
-            del args_to_id[id_to_args[self.name]][self.name]
+        all_deletions = []
+        keys = []
+        for key in args_to_id.keys():
+            bris = key.split(":")
+            if (self.name in bris):
+                if (args_to_id[key]() is not None):
+                    all_deletions.append(args_to_id[key]())
+                    keys.append(key)
+
+        # keys = []
+
         if (self.name in id_to_args.keys()):
+            for nes in id_to_args[self.name]:
+                if nes in args_to_id.keys():
+                    del args_to_id[nes]
             del id_to_args[self.name]
-        #del client_to_server_names[self.name]
+
+        for dels in all_deletions:
+            for key in args_to_id.keys():
+                bris = key.split(":")
+                if (dels.name in bris):
+                    all_deletions.append(args_to_id[key]())
+                    keys.append(key)
+
+
+        for key in keys:
+            if (key in args_to_id.keys()):
+                #pass
+                del args_to_id[key]
+
         cache_array(self)
 
     # except:
@@ -302,34 +345,79 @@ class pdarray:
 
     # overload + for pdarray, other can be {pdarray, int, float}
     def __add__(self, other):
+        if (isinstance(other,pdarray)):
+            name = other.name
+        else:
+            dt = resolve_scalar_dtype(other)
+            name = NUMBER_FORMAT_STRINGS[dt].format(other)
+        if (("+:"+self.name+":"+name) in args_to_id.keys()):
+            return args_to_id[("+:"+self.name+":"+name)]()
+        if (("+:" + name + ":" + self.name) in args_to_id.keys()):
+            return args_to_id[("+:" + name + ":" + self.name)]()
         if check_arr(self.dtype, self.size):
             return binOpWithStore(self, other, uncache_array(self.dtype, self.size), "+")
         return self._binop(other, "+")
 
     def __radd__(self, other):
+        if (isinstance(other,pdarray)):
+            name = other.name
+        else:
+            dt = resolve_scalar_dtype(other)
+            name = NUMBER_FORMAT_STRINGS[dt].format(other)
+        if (("+:"+self.name+":"+name) in args_to_id.keys()):
+            return args_to_id[("+:"+self.name+":"+name)]()
+        if (("+:" + other.name + ":" + self.name) in args_to_id.keys()):
+            return args_to_id[("+:" + name + ":" + self.name)]()
         return self._r_binop(other, "+")
 
     # overload - for pdarray, other can be {pdarray, int, float}
     def __sub__(self, other):
+        if (isinstance(other,pdarray)):
+            name = other.name
+        else:
+            dt = resolve_scalar_dtype(other)
+            name = NUMBER_FORMAT_STRINGS[dt].format(other)
+        if (("-:"+self.name+":"+name) in args_to_id.keys()):
+            return args_to_id[("-:"+self.name+":"+name)]()
         if check_arr(self.dtype, self.size):
             return binOpWithStore(self, other, uncache_array(self.dtype, self.size), "-")
         return self._binop(other, "-")
 
     def __rsub__(self, other):
+        if (isinstance(other,pdarray)):
+            name = other.name
+        else:
+            dt = resolve_scalar_dtype(other)
+            name = NUMBER_FORMAT_STRINGS[dt].format(other)
+        if (("-:" + name + ":" + self.name) in args_to_id.keys()):
+            return args_to_id[("-:" + name + ":" + self.name)]()
         return self._r_binop(other, "-")
 
     # overload * for pdarray, other can be {pdarray, int, float}
     def __mul__(self, other):
-        # print("Checking array")
-        # print(self.dtype)
-        # print(self.size)
-        # print(check_arr(self.dtype, self.size))
+        if (isinstance(other,pdarray)):
+            name = other.name
+        else:
+            dt = resolve_scalar_dtype(other)
+            name = NUMBER_FORMAT_STRINGS[dt].format(other)
+        if (("*:"+self.name+":"+name) in args_to_id.keys()):
+            return args_to_id[("*:"+self.name+":"+name)]()
+        if (("*:" + name + ":" + self.name) in args_to_id.keys()):
+            return args_to_id[("*:" + name + ":" + self.name)]()
         if check_arr(self.dtype, self.size):
-            # print("Calling mult and store", self.name, ' ', other.name)
             return binOpWithStore(self, other, uncache_array(self.dtype, self.size), "*")
         return self._binop(other, "*")
 
     def __rmul__(self, other):
+        if (isinstance(other,pdarray)):
+            name = other.name
+        else:
+            dt = resolve_scalar_dtype(other)
+            name = NUMBER_FORMAT_STRINGS[dt].format(other)
+        if (("*:"+self.name+":"+name) in args_to_id.keys()):
+            return args_to_id[("*:"+self.name+":"+name)]()
+        if (("*:" + name + ":" + self.name) in args_to_id.keys()):
+            return args_to_id[("*:" + name + ":" + self.name)]()
         return self._r_binop(other, "*")
 
     # overload / for pdarray, other can be {pdarray, int, float}
@@ -520,8 +608,20 @@ class pdarray:
         if isinstance(key, slice):
             (start, stop, stride) = key.indices(self.size)
             logger.debug('start: {} stop: {} stride: {}'.format(start, stop, stride))
-            repMsg = generic_msg(cmd="[slice]", args="{} {} {} {}".format(self.name, start, stop, stride))
-            return create_pdarray(repMsg);
+            size = (stop - start)//stride
+            if (check_arr(self.dtype, size)):
+                name = uncache_array(self.dtype, size)
+                arr = create_pdarray_with_name(name, cmd="[sliceStore]", cmd_args="", mydtype=self.dtype,
+                                               size=size, ndim=1, shape=[size], itemsize=self.dtype.itemsize)
+                args = "{} {} {} {} {}".format(self.name, start, stop, stride, arr.name)
+                arr.cmd_args = args
+                generic_msg(cmd="[sliceStore]", args=args, arr_id=arr.name, my_pdarray=[self, arr])
+                # print("name=", args)
+            else:
+                arr = pdarray(cmd="[slice]", cmd_args="{} {} {} {}".format(self.name, start, stop, stride), mydtype=self.dtype, size=(stop-start)//stride,
+                          ndim=1, shape=self.shape, itemsize=self.itemsize)
+                generic_msg(cmd="[slice]", args="{} {} {} {}".format(self.name, start, stop, stride), create_pdarray=True, arr_id=arr.name, my_pdarray=[self, arr])
+            return arr
         if isinstance(key, pdarray):
             kind, _ = translate_np_dtype(key.dtype)
             if kind not in ("bool", "int"):
@@ -542,7 +642,7 @@ class pdarray:
             if (key >= 0 and key < self.size):
                 generic_msg(cmd="[int]=val", args="{} {} {} {}". \
                             format(self.name, key, self.dtype.name,
-                                   self.format_other(value)))
+                                   self.format_other(value)), arr_id=self.name, my_pdarray=[self])
             else:
                 raise IndexError(("index {} is out of bounds with size {}". \
                                   format(orig_key, self.size)))
@@ -559,11 +659,11 @@ class pdarray:
             logger.debug('start: {} stop: {} stride: {}'.format(start, stop, stride))
             if isinstance(value, pdarray):
                 generic_msg(cmd="[slice]=pdarray", args="{} {} {} {} {}". \
-                            format(self.name, start, stop, stride, value.name))
+                            format(self.name, start, stop, stride, value.name), arr_id=self.name, my_pdarray=[self, value])
             else:
                 generic_msg(cmd="[slice]=val", args="{} {} {} {} {} {}". \
                             format(self.name, start, stop, stride, self.dtype.name,
-                                   self.format_other(value)))
+                                   self.format_other(value)), arr_id=self.name, my_pdarray=[self])
         else:
             raise TypeError("Unhandled key type: {} ({})". \
                             format(key, type(key)))
@@ -1946,12 +2046,18 @@ def binOpWithStore(pda_left: pdarray, pda_right: pdarray, pda_store_name: str, b
         args = "{} {} {} {}". \
             format(binop, pda_left.name, pda_right.name, arr.name)
         arr.cmd_args = args
-        if (arr.cmd + " : " + arr.cmd_args not in args_to_id.keys()):
-            args_to_id[arr.cmd + " : " + arr.cmd_args] = {}
-        id_to_args[arr.name] = arr.cmd + " : " + arr.cmd_args
-        # make weak ref
-        args_to_id[arr.cmd + " : " + arr.cmd_args][arr.name] = weakref.ref(arr)
-        generic_msg(cmd=cmd, args=args, my_pdarray=[pda_left, pda_right, arr])
+        argss = arr.cmd_args.split(' ')
+        op = argss[0]
+        thing1 = argss[1]
+        thing2 = argss[2]
+        args_to_id[op + ":" + thing1 + ":" + thing2] = weakref.ref(arr)
+        if (arr.name not in id_to_args):
+            id_to_args[arr.name] = []
+        id_to_args[arr.name].append(op + ":" + thing1 + ":" + thing2)
+        if (op == "+" or op == "*"):
+            args_to_id[op + ":" + thing2 + ":" + thing1] = weakref.ref(arr)
+            id_to_args[arr.name].append(op + ":" + thing2 + ":" + thing1)
+        generic_msg(cmd=cmd, args=args, arr_id=arr.name, my_pdarray=[pda_left, pda_right, arr])
         return arr
     else:
         dt = resolve_scalar_dtype(pda_right)
@@ -1962,11 +2068,17 @@ def binOpWithStore(pda_left: pdarray, pda_right: pdarray, pda_store_name: str, b
                                        pda_left.shape, pda_left.itemsize)
         args = "{} {} {} {} {}".format(binop, pda_left.name, dt, NUMBER_FORMAT_STRINGS[dt].format(pda_right), arr.name)
         arr.cmd_args = args
-        id_to_args[arr.name] = arr.cmd + " : " + arr.cmd_args
-        # make weak ref
-        if (arr.cmd + " : " + arr.cmd_args not in args_to_id.keys()):
-            args_to_id[arr.cmd + " : " + arr.cmd_args] = {}
-        args_to_id[arr.cmd + " : " + arr.cmd_args][arr.name] = weakref.ref(arr)
+        argss = arr.cmd_args.split(' ')
+        op = argss[0]
+        thing1 = argss[1]
+        thing2 = argss[3]
+        args_to_id[op + ":" + thing1 + ":" + thing2] = weakref.ref(arr)
+        if (arr.name not in id_to_args):
+            id_to_args[arr.name] = []
+        id_to_args[arr.name].append(op + ":" + thing1 + ":" + thing2)
+        if (op == "+" or op == "*"):
+            args_to_id[op + ":" + thing2 + ":" + thing1] = weakref.ref(arr)
+            id_to_args[arr.name].append(op + ":" + thing2 + ":" + thing1)
         generic_msg(cmd=cmd, args=args, create_pdarray=True, arr_id=arr.name, my_pdarray=[pda_left, arr])
         return arr
 
@@ -1976,9 +2088,6 @@ def multAndStore(pda_left: pdarray, pda_right: pdarray, pda_store_name: str) -> 
     args = "{} {} {} {}". \
         format("*", pda_left.name, pda_right.name, arr.name)
     arr.cmd_args = args
-    id_to_args[arr.name] = arr.cmd + " : " + arr.cmd_args
-    # make weak ref
-    args_to_id[arr.cmd + " : " + arr.cmd_args][arr.name] = weakref.ref(arr)
     generic_msg(cmd=cmd, args=args, my_pdarray=[pda_left, pda_right, arr])
     return arr
 
@@ -1995,8 +2104,9 @@ def cache_array(arr: pdarray):
     #print("----MAP----")
     #for (key, value) in client_to_server_names.items():
     #    print("key=", key, "value=", value)
-    # print("Caching ", client_to_server_names[arr.name])
+    print("Caching ", client_to_server_names[arr.name], arr.size    )
     cache[arr.dtype][arr.size].add(client_to_server_names[arr.name])
+    # print('caching',client_to_server_names[arr.name])
     client_to_server_names.pop(arr.name)
 
 
@@ -2008,7 +2118,7 @@ def check_arr(dtype, arr_size):
 def uncache_array(dtype, arr_size):
     if check_arr(dtype, arr_size):
         arr = cache[dtype][arr_size].pop()
-        # print("Uncaching ", arr)
+        print("Uncaching ", arr, arr_size)
         # print("New cache length ", len(cache[dtype][arr_size]))
         return arr
 

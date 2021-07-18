@@ -80,6 +80,30 @@ module MsgProcessing
         return new MsgTuple(repMsg, MsgType.NORMAL);
     }
 
+    proc zerosStoreMsg(cmd: string, payload: string, st: borrowed SymTab): MsgTuple throws {
+        var repMsg: string; // response message
+        // split request into fields
+        var (dtypestr, sizestr, store) = payload.splitMsgToTuple(3);
+        var dtype = str2dtype(dtypestr);
+        var size = try! sizestr:int;
+        var res: borrowed GenSymEntry = st.lookup(store);
+        var s = toSymEntry(res,int);
+        coforall a in s.a do
+            a = 0;
+        // if verbose print action
+        mpLogger.debug(getModuleName(),getRoutineName(),getLineNumber(),
+            "cmd: %s dtype: %s size: %i updated pdarray name: %s".format(
+                                                     cmd,dtype2str(dtype),size,store));
+        // if verbose print result
+        mpLogger.debug(getModuleName(),getRoutineName(),getLineNumber(),
+                                    "created the pdarray %s".format(st.attrib(store)));
+
+        repMsg = "created " + st.attrib(store);
+        mpLogger.debug(getModuleName(),getRoutineName(),getLineNumber(), repMsg);
+        return new MsgTuple(repMsg, MsgType.NORMAL);
+    }
+
+
     /* 
     Parse, execute, and respond to a delete message 
 

@@ -180,8 +180,8 @@ class GroupBy:
                                            effectiveKeys,
                                            ' '.join(keynames),
                                            ' '.join(keytypes))
-        repMsg = generic_msg(cmd=cmd,args=args)
-        segAttr, uniqAttr = cast(str,repMsg).split("+")
+        repMsg = generic_msg(cmd=cmd, args=args)
+        segAttr, uniqAttr = cast(str, repMsg).split("+")
         self.logger.debug('{},{}'.format(segAttr, uniqAttr))
         self.segments = cast(pdarray, create_pdarray(repMsg=cast(str,segAttr)))
         unique_key_indices = create_pdarray(repMsg=cast(str,uniqAttr))

@@ -50,6 +50,7 @@ module Indexing {
     }
 
     // concatenate 2 distributed arrays and return the result
+
     proc concatset(a: [?aD] ?t, b: [?bD] t) {
       var ret = makeDistArray((a.size + b.size), t);
       

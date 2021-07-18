@@ -59,8 +59,8 @@ def triangle_count_scalar(L: np.ndarray, nblocks_m, nblocks_n, nblocks_l):
     bB = create_blocks_scalar(L, bl, bn)
     bM = create_blocks_scalar(L, bm, bn)
 
-    # mxm_result = ak.zeros(1, dtype=np.int64)
-    # mxm_mask_result = ak.zeros(1, dtype=np.int64)
+    #mxm_result = ak.zeros(1, dtype=np.int64)
+    #mxm_mask_result = ak.zeros(1, dtype=np.int64)
 
     s = 0
     for i in range(nblocks_m):
@@ -69,16 +69,16 @@ def triangle_count_scalar(L: np.ndarray, nblocks_m, nblocks_n, nblocks_l):
                 # ak.multAndStore(bA[i * nblocks_l + k], bB[k * nblocks_n + j], mxm_result)
                 # ak.multAndStore(mxm_result, bM[i * nblocks_n + j], mxm_mask_result)
                 # print("\n*** mxm_result line *** ")
-                mxm_result = bA[i * nblocks_l + k] * bB[k * nblocks_n + j]
+                #mxm_result = bA[i * nblocks_l + k] * bB[k * nblocks_n + j]
                 # print("mxm_result id is", mxm_result.name)
                 # print("*** mxm_result line ***\n")
                 # print("\n*** mxm_mask_result line *** ")
-                mxm_mask_result = mxm_result * bM[i * nblocks_n + j]
+                #mxm_mask_result = mxm_result * bM[i * nblocks_n + j]
                 # print("mxm_mask_result id is", mxm_mask_result.name)
                 # print("*** mxm_mask_result line ***\n")
-                s += ak.sum(mxm_mask_result)
+                # s += ak.sum(mxm_mask_result)
 
-                # s += ak.sum((bA[i * nblocks_l + k] * bB[k * nblocks_n + j]) * bM[i * nblocks_n + j])
+                s += ak.sum((bA[i * nblocks_l + k] * bB[k * nblocks_n + j]) * bM[i * nblocks_n + j])
 
     return s
 
@@ -95,11 +95,11 @@ def create_blocks_scalar(A: np.ndarray, row_size, col_size):
 
     return out
 
-x = array = np.random.randint(2, size=(32, 32))
+x = array = np.random.randint(2, size=(4, 4))
 
 ak.connect(connect_url='tcp://andrej-X556UQ:5555')
 start = time.perf_counter()
-print(triangle_count_scalar(x, 16, 16, 16))
+print(triangle_count_scalar(x, 2, 2, 2))
 # print(triangle_count_numpy(x, 2, 2, 2, False))
 end = time.perf_counter()
 print(f"triangle count took {end - start:0.9f} seconds")

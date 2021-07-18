@@ -182,37 +182,31 @@ def betweenness_centrality_1d():
     # GrB reduce(&sum , GrB NULL, GrB PLUS MONOID INT32 , q , GrB NULL ) ;
     summation = ak.sum(q)
     # ++d ;
-    d += 10000
+    d += 3
 
     # GrB Vector t 1 ; GrB Vector new(&t1 , GrB FP32 , n ) ; for t1-t4
-    t1 = ak.zeros(n, ak.int64)
-    t2 = ak.zeros(n, ak.int64)
-    t3 = ak.zeros(n, ak.int64)
-    t4 = ak.zeros(n, ak.int64)
-    s=0
+    # t1 = ak.zeros(n, ak.int64)
+    # t2 = ak.zeros(n, ak.int64)
+    # t3 = ak.zeros(n, ak.int64)
+    # t4 = ak.zeros(n, ak.int64)
     for i in range(d - 1, 0, -1):
         # GrB assign ( t1 , GrB NULL, GrB NULL, 1 . 0 f , GrB ALL , n , GrB NULL ) ;
         t1 = ak.ones(n, ak.int64)
-        s+=t1.sum()
         # GrB eWiseAdd ( t1 , GrB NULL, GrB NULL, GrB PLUS MONOID FP32, t1 , ∗ delta , GrB NULL ) ;
         t1 = t1 + delta
         # G rB e x t r ac t ( t2 , GrB NULL, GrB NULL, sigma , GrB ALL , n , i , GrB DESC T0 ) ;
-        t2 = sigma[i%A.size]
+        t2 = sigma[i]
         # GrB eWiseMult ( t2 , GrB NULL, GrB NULL, GrB DIV FP32 , t1 , t2 , GrB NULL ) ;
         t2 = t1 // t2
-        s+=t2.sum()
         # GrB mxv ( t3 , GrB NULL, GrB NULL, GrB PLUS TIMES SEMIRING FP32 , A, t2 , GrB NULL ) ;
         t3 = A * t2
-        s += t3.sum()
         # G rB e x t r ac t ( t4 , GrB NULL, GrB NULL, sigma , GrB ALL , n , i −1,GrB DESC T0 ) ;
-        t4 = sigma[(i - 1) % A.size]
+        t4 = sigma[(i - 1)]
         # GrB eWiseMult ( t4 , GrB NULL, GrB NULL, GrB TIMES FP32 , t4 , t3 , GrB NULL ) ;
-        t4 = sigma[(i - 1) % A.size] * t3
-        s += t4.sum()
+        t4 = sigma[(i - 1)] * t3
         # GrB eWiseAdd (∗ d el t a , GrB NULL, GrB NULL, GrB PLUS FP32 , ∗ d el t a , t4 , GrB NULL ) ;
         delta = delta + t4
-        s += delta.sum()
-
+        print(delta)
     #ak.shutdown()
 
 

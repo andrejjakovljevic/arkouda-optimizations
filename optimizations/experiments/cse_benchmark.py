@@ -25,7 +25,6 @@ def radix_sort(array, radix=10):
     while (max_value - min_value) / exponent >= 1:
         array = counting_sort_by_digit(array, radix, exponent, min_value)
         exponent *= radix
-
     return array
 
 
@@ -1502,31 +1501,36 @@ def cse(L, M):
 
 
 def run_benchmarks():
-    ak.connect(connect_url='tcp://MacBook-Pro.local:5555')
+    ak.connect(connect_url='tcp://andrej-X556UQ:5555')
     # ak.connect(connect_url='tcp://nid01551:5555')
-    test_pd_array_one = ak.randint(0, 100, 10000)
+    test_pd_array_one = ak.randint(0, 100, 32)
     test_pd_array_two = ak.randint(0, 100, 32)
     test_pd_array_three = ak.randint(0, 100, 32)
 
     start = time.perf_counter()
-    radix_sort(test_pd_array_one)
+    print(test_pd_array_one)
+    test_pd_array_one = radix_sort(test_pd_array_one)
+    print(test_pd_array_one)
     end = time.perf_counter()
     print(f"sort_v1 took {end - start:0.9f} seconds")
 
-    # start = time.perf_counter()
-    # sort_v2(test_pd_array_one)
-    # end = time.perf_counter()
-    # print(f"sort_v2 took {end - start:0.9f} seconds")
+    start = time.perf_counter()
+    print(test_pd_array_two)
+    sort_v2(test_pd_array_two)
+    print(test_pd_array_two)
+    end = time.perf_counter()
+    print(f"sort_v2 took {end - start:0.9f} seconds")
     #
     # start = time.perf_counter()
-    # cse(test_pd_array_two, test_pd_array_three)
+    #print(cse(test_pd_array_two, test_pd_array_three))
+    # print(test_pd_array_three)
     # end = time.perf_counter()
     # print(f"cse took {end - start:0.9f} seconds")
 
     ak.shutdown()
 
 
-# run_benchmarks()
+run_benchmarks()
 
 
 # sort_v1 took 117.116571640 seconds

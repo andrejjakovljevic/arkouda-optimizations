@@ -356,6 +356,7 @@ proc main() {
                 when "repr"              {repTuple = reprMsg(cmd, args, st);}
                 when "[int]"             {repTuple = intIndexMsg(cmd, args, st);}
                 when "[slice]"           {repTuple = sliceIndexMsg(cmd, args, st);}
+                when "[sliceStore]"      {repTuple = sliceIndexStoreMsg(cmd, args, st);}
                 when "[pdarray]"         {repTuple = pdarrayIndexMsg(cmd, args, st);}
                 when "[int]=val"         {repTuple = setIntIndexToValueMsg(cmd, args, st);}
                 when "[pdarray]=val"     {repTuple = setPdarrayIndexToValueMsg(cmd, args, st);}
@@ -372,7 +373,8 @@ proc main() {
                 when "register"          {repTuple = registerMsg(cmd, args, st);}
                 when "attach"            {repTuple = attachMsg(cmd, args, st);}
                 when "unregister"        {repTuple = unregisterMsg(cmd, args, st);}
-                when "clear"             {repTuple = clearMsg(cmd, args, st);}               
+                when "clear"             {repTuple = clearMsg(cmd, args, st);}
+                when "zerosStore"        {repTuple = zerosStoreMsg(cmd, args, st);}
                 when "connect" {
                     if authenticate {
                         repTuple = new MsgTuple("connected to arkouda server tcp://*:%i as user %s with token %s".format(

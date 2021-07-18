@@ -13,8 +13,8 @@ def time_ak_setops(N_per_locale, trials, dtype, seed):
     N = N_per_locale * cfg["numLocales"]
     print("numLocales = {}, N = {:,}".format(cfg["numLocales"], N))
     if dtype == 'int64':
-        a = ak.randint(0, 2**32, N, seed=seed)
-        b = ak.randint(0, 2**32, N, seed=seed)
+        a = ak.randint(0, 1000, N, seed=seed)
+        b = ak.randint(0, 1000, N, seed=seed)
     
     timings = {op: [] for op in OPS}
     results = {}

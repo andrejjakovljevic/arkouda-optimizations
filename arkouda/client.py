@@ -8,6 +8,7 @@ from arkouda.logger import getArkoudaLogger
 from arkouda.message import RequestMessage, MessageFormat, ReplyMessage, \
     MessageType
 from queue import Queue
+import weakref
 
 __all__ = ["connect", "disconnect", "shutdown", "get_config", "get_mem_used", "ruok", "generic_msg", "client_to_server_names"]
 
@@ -35,12 +36,12 @@ clientLogger = getArkoudaLogger(name='Arkouda User Logger', logFormat='%(message
 print('{}'.format(pyfiglet.figlet_format('Arkouda')))
 print('Client Version: {}'.format(__version__)) # type: ignore
 
-queue_size: int = 10
+queue_size: int = 2
 
 q = Queue(queue_size)
 client_to_server_names = {}
 id_to_args = {}
-args_to_id = {str: {}}
+args_to_id = {}
 
 # reset settings to default values
 def set_defaults() -> None:
@@ -508,6 +509,7 @@ def shutdown() -> None:
         raise RuntimeError(e)
     connected = False
 
+maxNumServerVariables = 0
 
 def generic_msg(cmd: str, args: Union[str, bytes] = None, send_bytes: bool = False,
                 recv_bytes: bool = False, return_value_needed: bool = False,
@@ -604,7 +606,12 @@ def generic_msg(cmd: str, args: Union[str, bytes] = None, send_bytes: bool = Fal
                 logger.debug(("created Chapel array with name: {} dtype: {} size: {} ndim: {} shape: {} " +
                               "itemsize: {}").format(name, mydtype, size, ndim, shape, itemsize))
                 client_to_server_names[arr_id] = name
-                # print(arr_id, ' ', name)
+                num = int(name[3:])
+                global maxNumServerVariables
+                if (num > maxNumServerVariables):
+                    maxNumServerVariables = num
+                    print("max_num=",maxNumServerVariables)
+            # print("repmsg=",repMsg)
             return repMsg
 
         except KeyboardInterrupt as e:
@@ -765,7 +772,7 @@ def make_dependencies(item: BufferItem):
         # args_list_q_elem=list(filter(is_temporary, args_list_q_elem))
         for arg_q_elem in args_list_q_elem:
             if arg_q_elem in args_list and not(q_elem in item.dependencies):
-                item.dependencies.append(q_elem)
+                item.dependencies.append(weakref.ref(q_elem))
 
 def remove_from_queue(item: BufferItem):
     top = None
@@ -798,7 +805,8 @@ def execute_with_dependencies(item: BufferItem):
     if (item.executed):
         return
     for dependency in item.dependencies:
-        execute_with_dependencies(dependency)
+        if (dependency() is not None):
+            execute_with_dependencies(dependency)
     remove_from_queue(item)
     return item.execute()
 
