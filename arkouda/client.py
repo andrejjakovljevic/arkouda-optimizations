@@ -572,7 +572,9 @@ def generic_msg(cmd: str, args: Union[str, bytes] = None, send_bytes: bool = Fal
                                 my_pd_array=my_pdarray)
 
     if return_value_needed and not buff_emptying:
-        buff_push(buff_item)
+        ret = buff_push(buff_item)
+        if (q.empty()):
+            return ret
         return execute_with_dependencies(buff_item)
 
     # print("----MAP----")
@@ -583,8 +585,8 @@ def generic_msg(cmd: str, args: Union[str, bytes] = None, send_bytes: bool = Fal
         try:
             # Transform the args with client to server names
             args = transform_args(args)
-            # print("cmd=", cmd)
-            # print("args=",args)
+            print("cmd=", cmd)
+            print("args=",args)
             # Send the message
             if send_bytes:
                 repMsg = _send_binary_message(cmd=cmd,
@@ -610,7 +612,7 @@ def generic_msg(cmd: str, args: Union[str, bytes] = None, send_bytes: bool = Fal
                 global maxNumServerVariables
                 if (num > maxNumServerVariables):
                     maxNumServerVariables = num
-                    print("max_num=",maxNumServerVariables)
+                    print("max_num=", maxNumServerVariables)
             # print("repmsg=",repMsg)
             return repMsg
 
@@ -745,7 +747,8 @@ def buff_push(item: BufferItem):
     q.put(item)
     make_dependencies(item)
     if q.full():
-        buff_empty_partial(q.maxsize - 1)
+        return buff_empty_partial(q.maxsize - 1)
+    return None
 
 def is_temporary(arg: str):
     if (arg[:2]=="id"):
@@ -806,7 +809,7 @@ def execute_with_dependencies(item: BufferItem):
         return
     for dependency in item.dependencies:
         if (dependency() is not None):
-            execute_with_dependencies(dependency)
+            execute_with_dependencies(dependency())
     remove_from_queue(item)
     return item.execute()
 
@@ -820,4 +823,4 @@ def buff_empty():
 
 def buff_empty_partial(size):
     while q.qsize() > size:
-        q.get().execute()
+        return q.get().execute()

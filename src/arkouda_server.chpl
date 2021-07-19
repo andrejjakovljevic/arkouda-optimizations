@@ -327,6 +327,7 @@ proc main() {
                 when "binopvs"           {repTuple = binopvsMsg(cmd, args, st);}
                 when "binopvsStore"      {repTuple = binopvsStoreMsg(cmd, args, st);}
                 when "binopsv"           {repTuple = binopsvMsg(cmd, args, st);}
+                when "binopsvStore"      {repTuple = binopsvStoreMsg(cmd, args, st);}
                 when "opeqvv"            {repTuple = opeqvvMsg(cmd, args, st);}
                 when "opeqvs"            {repTuple = opeqvsMsg(cmd, args, st);}
                 when "efunc"             {repTuple = efuncMsg(cmd, args, st);}

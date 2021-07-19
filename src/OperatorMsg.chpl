@@ -915,6 +915,58 @@ module OperatorMsg
         return new MsgTuple(repMsg, MsgType.NORMAL);
     }
 
+    proc binopsvStoreMsg(cmd: string, payload: string, st: borrowed SymTab): MsgTuple throws {
+        param pn = Reflection.getRoutineName();
+        var repMsg: string = ""; // response message
+
+        // split request into fields
+        var (op, dtypeStr, value, aname, store) = payload.splitMsgToTuple(5);
+
+        var dtype = str2dtype(dtypeStr);
+        var rname = st.nextName();
+        var right: borrowed GenSymEntry = st.lookup(aname);
+        var res: borrowed GenSymEntry = st.lookup(store);
+
+        select (dtype, right.dtype) {
+            when (DType.Int64, DType.Int64) {
+                var val = try! value:int;
+                var r = toSymEntry(right,int);
+                var s = toSymEntry(res, int);
+                select op
+                {
+                    when "+" {
+                        s.a = val + r.a;
+                    }
+                    when "-" {
+                        s.a = val - r.a;
+                    }
+                    when "*" {
+                        s.a = val * r.a;
+                    }
+                    when "//" { // floordiv
+                        ref sa = s.a;
+                        ref ra = r.a;
+                        [(si,ri) in zip(sa,ra)] si = if ri != 0 then val/ri else 0;
+                    }
+                    otherwise {
+                        var errorMsg = notImplementedError(pn,dtype,op,right.dtype);
+                        omLogger.error(getModuleName(),getRoutineName(),getLineNumber(),errorMsg);
+                        return new MsgTuple(errorMsg, MsgType.ERROR);
+                    }
+                }
+            }
+            otherwise {
+                var errorMsg = unrecognizedTypeError(pn,
+                                     "("+dtype2str(dtype)+","+dtype2str(right.dtype)+")");
+                omLogger.error(getModuleName(),getRoutineName(),getLineNumber(),errorMsg);
+                return new MsgTuple(errorMsg, MsgType.ERROR);
+            }
+        }
+        repMsg = "updated %s".format(st.attrib(store));
+        omLogger.debug(getModuleName(),getRoutineName(),getLineNumber(),repMsg);
+        return new MsgTuple(repMsg, MsgType.NORMAL);
+    }
+
     /*
     Parse and respond to binopsv message.
     sv == scalar op vector
@@ -1350,6 +1402,8 @@ module OperatorMsg
         omLogger.debug(getModuleName(),getRoutineName(),getLineNumber(),repMsg);
         return new MsgTuple(repMsg, MsgType.NORMAL);
     }
+
+
 
     /*
     Parse and respond to opeqvv message.

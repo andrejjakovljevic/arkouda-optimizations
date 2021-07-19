@@ -332,12 +332,28 @@ def ones(size: int_scalars, dtype: type = float64) -> pdarray:
     # check dtype for error
     if cast(np.dtype, dtype).name not in NumericDTypes:
         raise TypeError("unsupported dtype {}".format(dtype))
-    arr = pdarray(cmd='create', cmd_args='{} {}'.format(cast(np.dtype, dtype).name, size), mydtype=dtype.name,
+    if check_arr(dtype, size):
+        cmd = "zerosStore"
+        name = uncache_array(dtype, size)
+
+        arr = create_pdarray_with_name(name, cmd, "", dtype, size, 1,
+                                       [size], dtype.itemsize)
+
+        args='{} {} {}'. \
+                format(cast(np.dtype, dtype).name, size, arr.name)
+
+        arr.cmd_args = args
+
+        generic_msg(cmd=cmd, args=args, arr_id=arr.name, my_pdarray=[arr])
+
+    else:
+        arr = pdarray(cmd='create', cmd_args='{} {}'.format(cast(np.dtype, dtype).name, size), mydtype=dtype.name,
                   size=size, ndim=1, shape=[size], itemsize=dtype.itemsize)
 
-    generic_msg(cmd='create', args='{} {}'. \
+        generic_msg(cmd='create', args='{} {}'. \
                 format(cast(np.dtype, dtype).name, size),
                 create_pdarray=True, return_value_needed=True, buff_emptying=False, arr_id=arr.name, my_pdarray=[arr])
+
     arr.fill(1)
     return arr
 

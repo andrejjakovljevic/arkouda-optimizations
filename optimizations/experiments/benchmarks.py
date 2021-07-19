@@ -182,7 +182,7 @@ def betweenness_centrality_1d():
     # GrB reduce(&sum , GrB NULL, GrB PLUS MONOID INT32 , q , GrB NULL ) ;
     summation = ak.sum(q)
     # ++d ;
-    d += 3
+    d += 4
 
     # GrB Vector t 1 ; GrB Vector new(&t1 , GrB FP32 , n ) ; for t1-t4
     # t1 = ak.zeros(n, ak.int64)
@@ -227,7 +227,10 @@ x = np.array([[0, 0, 0, 0],
               [0, 1, 1, 0]])
 # print(triangle_count_numpy(x, 2, 2, 2, False))
 
+
+print('a')
 ak.connect(connect_url='tcp://andrej-X556UQ:5555')
+print('b')
 # x = ak.randint(0, 10, 100)
 # y = ak.randint(0, 10, 100)
 # z = x + y

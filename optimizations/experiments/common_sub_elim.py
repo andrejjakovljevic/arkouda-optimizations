@@ -1,13 +1,17 @@
 import arkouda as ak
+import time
 
-
-def complex_one(a):
+def complex_one(a, b):
     """
     Problem: Does not remember a * a which can be a reusable temporary
     """
     # Creates 3 total temporaries
     # Calculates a * a twice
-    (a * a) + (a * a)
+    # c = (a * a)
+    d = ak.zeros(10000, dtype=ak.int64)
+    for i in range(10):
+        d = d + (a * a)
+    print(d)
 
 
 def complex_two(a, b):
@@ -55,8 +59,11 @@ def sort_three(a, b):
     ak.argsort(ak.concatenate([a, b]))
 
 
-ak.connect(connect_url='tcp://MacBook-Pro.local:5555')
+ak.connect(connect_url='tcp://andrej-X556UQ:5555')
 A = ak.randint(0, 10000, 10000)
 B = ak.randint(0, 10000, 10000)
-A + B
-sort_three(A, B)
+start = time.perf_counter()
+complex_one(A, B)
+end = time.perf_counter()
+print(f"triangle count took {end - start:0.9f} seconds")
+ak.shutdown()

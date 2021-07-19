@@ -327,21 +327,27 @@ class pdarray:
             Raised if other is not a pdarray or the pdarray.dtype is not
             a supported dtype
         """
-        return self._binop(other, op)
 
         if op not in self.BinOps:
             raise ValueError("bad operator {}".format(op))
         # pdarray binop scalar
+        if (check_arr(self.dtype, self.size)):
+            return binOpWithStore(other, self, uncache_array(self.dtype, self.size), op)
+
         dt = resolve_scalar_dtype(other)
         if dt not in DTypes:
             raise TypeError("Unhandled scalar type: {} ({})".format(other,
                                                                     type(other)))
+
         cmd = "binopsv"
         args = "{} {} {} {}". \
             format(op, dt, NUMBER_FORMAT_STRINGS[dt].format(other),
                    self.name)
-        repMsg = generic_msg(cmd=cmd, args=args)
-        return create_pdarray(repMsg)
+
+        arr = pdarray(cmd=cmd, cmd_args=args, mydtype=self.dtype, size=self.size,
+                      ndim=1, shape=self.shape, itemsize=self.itemsize)
+        generic_msg(cmd=cmd, args=args, create_pdarray=True, arr_id=arr.name, my_pdarray=[self, arr])
+        return arr
 
     # overload + for pdarray, other can be {pdarray, int, float}
     def __add__(self, other):
@@ -2039,7 +2045,7 @@ def unregister_pdarray_by_name(user_defined_name:str) -> None:
     repMsg = generic_msg(cmd="unregister", args=user_defined_name)
 
 def binOpWithStore(pda_left: pdarray, pda_right: pdarray, pda_store_name: str, binop: str) -> pdarray:
-    if isinstance(pda_right, pdarray):
+    if isinstance(pda_right, pdarray) and isinstance(pda_left, pdarray):
         cmd = "binopvvStore"
         arr = create_pdarray_with_name(pda_store_name, cmd, "", pda_left.dtype, pda_left.size, pda_left.ndim,
                                        pda_left.shape, pda_left.itemsize)
@@ -2059,7 +2065,7 @@ def binOpWithStore(pda_left: pdarray, pda_right: pdarray, pda_store_name: str, b
             id_to_args[arr.name].append(op + ":" + thing2 + ":" + thing1)
         generic_msg(cmd=cmd, args=args, arr_id=arr.name, my_pdarray=[pda_left, pda_right, arr])
         return arr
-    else:
+    elif isinstance(pda_left, pdarray):
         dt = resolve_scalar_dtype(pda_right)
         if dt not in DTypes:
             raise TypeError("Unhandled scalar type: {} ({})".format(pda_right, type(pda_right)))
@@ -2079,8 +2085,33 @@ def binOpWithStore(pda_left: pdarray, pda_right: pdarray, pda_store_name: str, b
         if (op == "+" or op == "*"):
             args_to_id[op + ":" + thing2 + ":" + thing1] = weakref.ref(arr)
             id_to_args[arr.name].append(op + ":" + thing2 + ":" + thing1)
-        generic_msg(cmd=cmd, args=args, create_pdarray=True, arr_id=arr.name, my_pdarray=[pda_left, arr])
+        generic_msg(cmd=cmd, args=args, create_pdarray=False, arr_id=arr.name, my_pdarray=[pda_left, arr])
         return arr
+    else:
+        dt = resolve_scalar_dtype(pda_left)
+        if dt not in DTypes:
+            raise TypeError("Unhandled scalar type: {} ({})".format(pda_right, type(pda_right)))
+        cmd = "binopsvStore"
+        arr = create_pdarray_with_name(pda_store_name, cmd, "", pda_right.dtype, pda_right.size, pda_right.ndim,
+                                       pda_right.shape, pda_right.itemsize)
+        args = "{} {} {} {} {}". \
+            format(binop, dt, NUMBER_FORMAT_STRINGS[dt].format(pda_left),
+                   pda_right.name, arr.name)
+        arr.cmd_args = args
+        argss = arr.cmd_args.split(' ')
+        op = argss[0]
+        thing1 = argss[2]
+        thing2 = argss[3]
+        args_to_id[op + ":" + thing1 + ":" + thing2] = weakref.ref(arr)
+        if (arr.name not in id_to_args):
+            id_to_args[arr.name] = []
+        id_to_args[arr.name].append(op + ":" + thing1 + ":" + thing2)
+        if (op == "+" or op == "*"):
+            args_to_id[op + ":" + thing2 + ":" + thing1] = weakref.ref(arr)
+            id_to_args[arr.name].append(op + ":" + thing2 + ":" + thing1)
+        generic_msg(cmd=cmd, args=args, create_pdarray=False, arr_id=arr.name, my_pdarray=[pda_right, arr])
+        return arr
+
 
 def multAndStore(pda_left: pdarray, pda_right: pdarray, pda_store_name: str) -> pdarray:
     cmd = "binopvvStore"
