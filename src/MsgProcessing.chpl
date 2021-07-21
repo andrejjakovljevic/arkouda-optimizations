@@ -81,7 +81,7 @@ module MsgProcessing
     }
 
     inline proc calcGlobalIndex(bucket: int, loc: int, task: int): int {
-        return ((bucket * numLocales * numTasks) + (loc * numTasks) + task);
+            return ((bucket * numLocales * numTasks) + (loc * numTasks) + task);
     }
     /* 
     Parse, execute, and respond to a create message 
@@ -600,9 +600,9 @@ module MsgProcessing
             return (b + arg3);
         };
         var kr0: [a.aD] (a.etype,int) = [(key,rank) in zip(a.a,a.aD)] (key,rank);
-        coforall loc in Locales {
+        forall loc in Locales {
                 on loc {
-                    coforall task in Tasks {
+                    forall task in Tasks {
                         // bucket domain
                         var bD = {0..#b.a.size};
                         // allocate counts
