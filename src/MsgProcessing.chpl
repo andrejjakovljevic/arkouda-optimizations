@@ -54,8 +54,6 @@ module MsgProcessing
 
     config param RSLSD_bitsPerDigit = 16;
     private param bitsPerDigit = RSLSD_bitsPerDigit; // these need to be const for comms/performance reasons
-    private param numBuckets = 1 << bitsPerDigit; // these need to be const for comms/performance reasons
-    private param maskDigit = numBuckets-1; // these need to be const for comms/performance reasons
     
     private config const logLevel = ServerConfig.logLevel;
     const mpLogger = new Logger(logLevel);
@@ -600,6 +598,7 @@ module MsgProcessing
             return (b + arg3);
         };
         var kr0: [a.aD] (a.etype,int) = [(key,rank) in zip(a.a,a.aD)] (key,rank);
+        var lock : sync bool;
         forall loc in Locales {
                 on loc {
                     forall task in Tasks {
@@ -620,12 +619,11 @@ module MsgProcessing
                             taskBucketCounts[bucket] += listOfArgs[3];
                         }
                         // write counts in to global counts in transposed order
-                        var aggregator = newDstAggregator(int);
                         for bucket in bD {
-                            aggregator.copy(b.a[calcGlobalIndex(bucket, loc.id, task)],
-                                                         taskBucketCounts[bucket]);
-                    }
-                    aggregator.flush();
+                            lock.writeEF(true);
+                            b.a[bucket] = b.a[bucket] + taskBucketCounts[bucket];
+                            lock.reset();
+                        }
                 }//coforall task
             }//on loc
         }//coforall loc
