@@ -177,5 +177,6 @@ def sort(pda : pdarray) -> pdarray:
         return zeros(0, dtype=int64)
     if pda.dtype not in numeric_dtypes:
         raise ValueError("ak.sort supports float64 or int64, not {}".format(pda.dtype))
-    repMsg = generic_msg(cmd="sort", args="{}".format(pda.name))
-    return create_pdarray(cast(str,repMsg))
+    arr = pdarray(cmd="sort", cmd_args="{}".format(pda.name), mydtype=pda.dtype, size=pda.size, ndim=1, shape=[pda.size], itemsize=pda.dtype.itemsize)
+    generic_msg(cmd="sort", args="{}".format(pda.name), arr_id=arr.name, my_pdarray=[pda, arr])
+    return arr

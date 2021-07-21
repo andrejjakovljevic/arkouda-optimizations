@@ -315,8 +315,8 @@ def union1d(pda1 : pdarray, pda2 : pdarray) -> pdarray:
         return pda1 # union is pda1
     if pda1.dtype == int and pda2.dtype == int:
         repMsg = generic_msg(cmd="union1d", args="{} {}".\
-                             format(pda1.name, pda2.name))
-        return cast(pdarray,create_pdarray(repMsg))
+                             format(pda1.name, pda2.name), return_value_needed=True)
+        arr = cast(pdarray, create_pdarray(repMsg))
     return cast(pdarray,
                 unique(cast(pdarray,
                             concatenate((unique(pda1), unique(pda2)), ordered=False)))) # type: ignore

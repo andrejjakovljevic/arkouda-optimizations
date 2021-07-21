@@ -27,7 +27,7 @@ module ReductionMsg
     // these functions take an array and produce a scalar
     // parse and respond to reduction message
     // scalar = reductionop(vector)
-    proc reductionMsg(cmd: string, payload: string, st: borrowed SymTab): MsgTuple throws {
+        proc reductionMsg(cmd: string, payload: string, st: borrowed SymTab): MsgTuple throws {
         param pn = Reflection.getRoutineName();
         var repMsg: string = ""; // response message
         // split request into fields

@@ -1534,7 +1534,7 @@ def min(pda: pdarray) -> numpy_scalars:
     RuntimeError
         Raised if there's a server-side error thrown
     """
-    repMsg = generic_msg(cmd="reduction", args="{} {}".format("min", pda.name))
+    repMsg = generic_msg(cmd="reduction", args="{} {}".format("min", pda.name), return_value_needed = True, arr_id=pda.name, my_pdarray=[pda])
     return parse_single_value(cast(str, repMsg))
 
 
@@ -1560,7 +1560,7 @@ def max(pda: pdarray) -> numpy_scalars:
     RuntimeError
         Raised if there's a server-side error thrown
     """
-    repMsg = generic_msg(cmd="reduction", args="{} {}".format("max", pda.name))
+    repMsg = generic_msg(cmd="reduction", args="{} {}".format("max", pda.name), return_value_needed = True, arr_id=pda.name, my_pdarray=[pda])
     return parse_single_value(cast(str, repMsg))
 
 

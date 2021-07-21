@@ -10,20 +10,27 @@ def counting_sort_by_digit(array, radix, exponent, min_value):
     buckets = ak.zeros(radix, dtype=ak.int64)
     output = ak.zeros(len(array), dtype=ak.int64)
 
+    move = 1
+    ak.count_frequencies(array, buckets, 4, [min_value, exponent, radix, move])
     # Count frequencies
-    for i in range(0, len(array)):
-        bucket_index = math.floor(((array[i] - min_value) / exponent) % radix)
-        buckets[bucket_index] += 1
+    #for i in range(0, len(array)):
+    #    bucket_index = math.floor(((array[i] - min_value) / exponent) % radix)
+    #    buckets[bucket_index] += 1
 
     # Compute cumulates
-    for i in range(1, radix):
-        buckets[i] += buckets[i - 1]
+    #print(buckets)
+    ak.cumsum(buckets)
+    #print(buckets)
+    #for i in range(1, radix):
+    #    buckets[i] += buckets[i - 1]
 
     # Move records
-    for i in range(len(array) - 1, -1, -1):
-        bucket_index = math.floor(((array[i] - min_value) / exponent) % radix)
-        buckets[bucket_index] -= 1
-        output[buckets[bucket_index]] = array[i]
+    move = -1
+    ak.move_records(array, buckets, output, 4, [min_value, exponent, radix, move])
+    #for i in range(len(array) - 1, -1, -1):
+    #    bucket_index = math.floor(((array[i] - min_value) / exponent) % radix)
+    #    buckets[bucket_index] -= 1
+    #    output[buckets[bucket_index]] = array[i]
 
     return output
 
@@ -64,13 +71,8 @@ def radix_sort(array, radix=10):
         return array
 
     # Determine minimum and maximum values
-    min_value = array[0]
-    max_value = array[0]
-    for i in range(1, len(array)):
-        if array[i] < min_value:
-            min_value = array[i]
-        elif array[i] > max_value:
-            max_value = array[i]
+    min_value = array.min()
+    max_value = array.max()
 
     # Perform counting sort on each exponent/digit, starting at the least
     # significant digit
@@ -98,10 +100,12 @@ def union(a, b):
     return uniqueFromSorted(radix_sort((concat(a,b))))
 
 ak.connect(connect_url='tcp://andrej-X556UQ:5555')
-a = ak.randint(0, 100, 100)
-b = ak.randint(0, 100, 100)
+a = ak.randint(0, 10000, 100)
+# b = ak.randint(0, 10000, 100)
 start = time.perf_counter()
-c = union(a, b)
+c = radix_sort(a)
+# c = ak.sort(a)
+# c=ak.union1d(a,b)
 print(c)
 end = time.perf_counter()
 print(f"union_v1 took {end - start:0.9f} seconds")

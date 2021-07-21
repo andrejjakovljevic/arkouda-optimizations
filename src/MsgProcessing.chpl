@@ -36,10 +36,53 @@ module MsgProcessing
     public use CastMsg;
     public use BroadcastMsg;
     public use FlattenMsg;
+    use BlockDist;
+    use BitOps;
+    use AryUtil;
+    use CommAggregation;
+    use IO;
+    use CPtr;
+    use Reflection;
+    use Logging;
+    use ServerConfig;
+    config const RSLSD_vv = false;
+    const vv = RSLSD_vv; // these need to be const for comms/performance reasons
+
+    config const RSLSD_numTasks = here.maxTaskPar; // tasks per locale based on locale0
+    const numTasks = RSLSD_numTasks; // tasks per locale
+    const Tasks = {0..#numTasks}; // these need to be const for comms/performance reasons
+
+    config param RSLSD_bitsPerDigit = 16;
+    private param bitsPerDigit = RSLSD_bitsPerDigit; // these need to be const for comms/performance reasons
+    private param numBuckets = 1 << bitsPerDigit; // these need to be const for comms/performance reasons
+    private param maskDigit = numBuckets-1; // these need to be const for comms/performance reasons
     
     private config const logLevel = ServerConfig.logLevel;
     const mpLogger = new Logger(logLevel);
-    
+
+    const rsLogger = new Logger(logLevel);
+
+    // calculate sub-domain for task
+    inline proc calcBlock(task: int, low: int, high: int) {
+        var totalsize = high - low + 1;
+        var div = totalsize / numTasks;
+        var rem = totalsize % numTasks;
+        var rlow: int;
+        var rhigh: int;
+        if (task < rem) {
+            rlow = task * (div+1) + low;
+            rhigh = rlow + div;
+        }
+        else {
+            rlow = task * div + rem + low;
+            rhigh = rlow + div - 1;
+        }
+        return {rlow .. rhigh};
+    }
+
+    inline proc calcGlobalIndex(bucket: int, loc: int, task: int): int {
+        return ((bucket * numLocales * numTasks) + (loc * numTasks) + task);
+    }
     /* 
     Parse, execute, and respond to a create message 
 
@@ -498,6 +541,153 @@ module MsgProcessing
         }
 
         mpLogger.debug(getModuleName(),getRoutineName(),getLineNumber(),repMsg);
+        return new MsgTuple(repMsg, MsgType.NORMAL);
+    }
+
+    /**
+    *
+        Count frequencies
+    *
+    */
+
+    class MyScanOp: ReduceScanOp {
+        type eltType;
+        var arg1: int;
+        var arg2: int;
+        var arg3: int;
+        var value = _prod_id(eltType);
+
+        proc identity return _prod_id(eltType);
+        proc accumulate(x) {
+            var f1: func(int,int,int,int,int) = lambda(a: int, arg1: int, arg2: int, arg3: int) {
+                 return (((a - arg1) / arg2) % arg3);
+            };
+          value *= x;
+        }
+        proc accumulateOntoState(ref state, x) {
+          state *= x;
+        }
+        proc combine(x) {
+          value *= x.value;
+        }
+        proc generate() return value;
+        proc clone() return new unmanaged ProductReduceScanOp(eltType=eltType);
+    }
+
+    proc countFrequenciesMsg(cmd: string, payload: string, st: borrowed SymTab): MsgTuple throws {
+        param pn = Reflection.getRoutineName();
+        var repMsg: string; // response message
+        var (name1, name2, nStr, listOfArgsString) = payload.splitMsgToTuple(4);
+        var n = try! nStr:int;
+        var name1E: borrowed GenSymEntry = st.lookup(name1);
+        var name2E: borrowed GenSymEntry = st.lookup(name2);
+        listOfArgsString = listOfArgsString.strip("[]");
+        listOfArgsString = listOfArgsString.replace(",","");
+        var split: [1..n] string = listOfArgsString.split(' ');
+        var listOfArgs: [1..n] int;
+        var k: int = 0;
+        for s in split do {
+            listOfArgs[k] = try! s:int;
+            k = k+1;
+        }
+        var a = toSymEntry(name1E, int);
+        var b = toSymEntry(name2E, int);
+
+        var f1: func(int,int,int,int,int) = lambda(a: int, arg1: int, arg2: int, arg3: int) {
+             return (((a - arg1) / arg2) % arg3);
+        };
+        var f2 = lambda(b: int, arg3: int) {
+            return (b + arg3);
+        };
+        var kr0: [a.aD] (a.etype,int) = [(key,rank) in zip(a.a,a.aD)] (key,rank);
+        coforall loc in Locales {
+                on loc {
+                    coforall task in Tasks {
+                        // bucket domain
+                        var bD = {0..#b.a.size};
+                        // allocate counts
+                        var taskBucketCounts: [bD] int;
+                        // get local domain's indices
+                        var lD = kr0.localSubdomain();
+                        // calc task's indices from local domain's indices
+                        var tD = calcBlock(task, lD.low, lD.high);
+                        try! rsLogger.debug(getModuleName(),getRoutineName(),getLineNumber(),
+                                   "locid: %t task: %t tD: %t".format(loc.id,task,tD));
+                        // count digits in this task's part of the array
+                        for i in tD {
+                            const (key,_) = kr0[i];
+                            var bucket = f1(key, listOfArgs[0], listOfArgs[1], listOfArgs[2]); // calc bucket from key
+                            taskBucketCounts[bucket] += listOfArgs[3];
+                        }
+                        // write counts in to global counts in transposed order
+                        var aggregator = newDstAggregator(int);
+                        for bucket in bD {
+                            aggregator.copy(b.a[calcGlobalIndex(bucket, loc.id, task)],
+                                                         taskBucketCounts[bucket]);
+                    }
+                    aggregator.flush();
+                }//coforall task
+            }//on loc
+        }//coforall loc
+        repMsg = "updated %s".format(st.attrib(name1));
+        return new MsgTuple(repMsg, MsgType.NORMAL);
+    }
+
+    /**
+
+    * Move records
+
+    **/
+    proc moveRecordsMsg(cmd: string, payload: string, st: borrowed SymTab): MsgTuple throws
+    {
+        param pn = Reflection.getRoutineName();
+        var repMsg: string; // response message
+        var (name1, name2, name3, nStr, listOfArgsString) = payload.splitMsgToTuple(5);
+        var ret: int = 0;
+        var n = try! nStr:int;
+        var name1E: borrowed GenSymEntry = st.lookup(name1);
+        var name2E: borrowed GenSymEntry = st.lookup(name2);
+        var name3E: borrowed GenSymEntry = st.lookup(name3);
+        listOfArgsString = listOfArgsString.strip("[]");
+        listOfArgsString = listOfArgsString.replace(",","");
+        var split: [1..n] string = listOfArgsString.split(' ');
+        var listOfArgs: [1..n] int;
+        var k: int = 0;
+        for s in split do {
+            listOfArgs[k] = try! s:int;
+            k = k+1;
+        }
+        var f1 = lambda(a: int, arg1: int, arg2: int, arg3: int) {
+             return (((a - arg1) / arg2) % arg3);
+        };
+        var f2 = lambda(b: int, arg3: int) {
+            return (b + arg3);
+        };
+        var a = toSymEntry(name1E, int);
+        var b = toSymEntry(name2E, int);
+        var c = toSymEntry(name3E, int);
+        a.a.reverse();
+        var lock: sync bool;
+        for k in a.a {
+            var ret: int = f1(k, listOfArgs[0], listOfArgs[1], listOfArgs[2]);
+            // lock.writeEF(true);
+            b.a[ret] = f2(b.a[ret], listOfArgs[3]);
+            c.a[b.a[ret]] = k;
+            // lock.reset();
+        }
+        a.a.reverse();
+        repMsg = "updated %s".format(st.attrib(name1));
+        return new MsgTuple(repMsg, MsgType.NORMAL);
+    }
+
+    proc cumSumMsg(cmd: string, payload: string, st: borrowed SymTab): MsgTuple throws {
+        param pn = Reflection.getRoutineName();
+        var repMsg: string; // response message
+        var (name1) = payload.splitMsgToTuple(1);
+        var name1E: borrowed GenSymEntry = st.lookup(name1);
+        var a = toSymEntry(name1E, int);
+        a.a = + scan a.a;
+        repMsg = "updated %s".format(name1);
         return new MsgTuple(repMsg, MsgType.NORMAL);
     }
 }
