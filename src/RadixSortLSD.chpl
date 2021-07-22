@@ -171,7 +171,6 @@ module RadixSortLSD
             coforall loc in Locales {
                 on loc {
                     coforall task in Tasks {
-                        writeln("nes");
                         // bucket domain
                         var bD = {0..#numBuckets};
                         // allocate counts
@@ -188,7 +187,6 @@ module RadixSortLSD
                             var bucket = getDigit(key, rshift, last, negs); // calc bucket from key
                             taskBucketCounts[bucket] += 1;
                         }
-                        writeln("nes2");
                         // write counts in to global counts in transposed order
                         var aggregator = newDstAggregator(int);
                         for bucket in bD {

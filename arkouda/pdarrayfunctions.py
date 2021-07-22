@@ -11,13 +11,13 @@ from arkouda.dtypes import dtype as akdtype
 from arkouda.pdarrayclass import pdarray, create_pdarray, check_arr, uncache_array, create_pdarray_with_name, parse_single_value
 from arkouda.strings import Strings
 
-__all__ = ["count_frequencies", "move_records", "cumsum"
+__all__ = ["count_frequencies", "move_records", "cumsum", "remove_duplicates"
            ]
 
 def count_frequencies(a: pdarray, b: pdarray, n: int, l: list) -> int:
     cmd = "count_frequencies"
     cmd_args = "{} {} {} {}".format(a.name, b.name, n, l)
-    generic_msg(cmd, cmd_args, return_value_needed=False, my_pdarray=[a, b])
+    generic_msg(cmd, cmd_args, return_value_needed=False,  my_pdarray=[a, b])
 
 def move_records(a: pdarray, b: pdarray, c: pdarray, n: int, l: list) -> int:
     cmd = "move_records"
@@ -27,4 +27,16 @@ def move_records(a: pdarray, b: pdarray, c: pdarray, n: int, l: list) -> int:
 def cumsum(a: pdarray):
     cmd = "cumsum"
     cmd_args = "{}".format(a.name)
-    generic_msg(cmd, cmd_args, my_pdarray=[a])
+    generic_msg(cmd, cmd_args, return_value_needed=False, my_pdarray=[a])
+
+def remove_duplicates(a: pdarray):
+    cmd = "remove_duplicates"
+    cmd_args = "{}".format(a.name)
+    arr = pdarray(cmd, cmd_args, a.dtype, 0, 1, [0], a.dtype.itemsize)
+    repMsg = generic_msg(cmd, cmd_args, create_pdarray=True, return_value_needed=True, arr_id=arr.name, my_pdarray=[arr, a])
+    fields = repMsg.split()
+    size = int(fields[3])
+    arr.size = size 
+    arr.shape = [size]
+    print("size=",size)
+    return arr

@@ -262,8 +262,15 @@ def concatenate(arrays : Sequence[Union[pdarray,Strings,'Categorical']], #type: 
     repMsg = generic_msg(cmd="concatenate", args="{} {} {} {}".\
                             format(len(arrays), objtype, mode, ' '.join(names)))
     if objtype == "pdarray":
-        return create_pdarray(cast(str,repMsg))
+        size = 0
+        for a in arrays:
+            size = size + a.size
+        arr = pdarray("concatenate", "{} {} {} {}".format(len(arrays), objtype, mode, ' '.join(names)),arrays[0].dtype,size,1,[size],arrays[0].dtype.itemsize)
+        repMsg = generic_msg(cmd="concatenate", args="{} {} {} {}".\
+                            format(len(arrays), objtype, mode, ' '.join(names)),create_pdarray=True, arr_id=arr.name, my_pdarray=arrays)
+        return arr
     elif objtype == "str":
+        repMsg = generic_msg("concatenate", "{} {} {} {}".format(len(arrays), objtype, mode, ' '.join(names)), return_value_needed=True)
         return Strings(*(cast(str,repMsg).split('+')))
     else:
         raise TypeError('arrays must be an array of pdarray or Strings objects')

@@ -379,6 +379,7 @@ proc main() {
                 when "count_frequencies" {repTuple = countFrequenciesMsg(cmd, args, st);}
                 when "move_records"      {repTuple = moveRecordsMsg(cmd, args, st);}
                 when "cumsum"            {repTuple = cumSumMsg(cmd,args,st);}
+                when "remove_duplicates" {repTuple = removeDuplicatesMsg(cmd,args,st);}
                 when "connect" {
                     if authenticate {
                         repTuple = new MsgTuple("connected to arkouda server tcp://*:%i as user %s with token %s".format(

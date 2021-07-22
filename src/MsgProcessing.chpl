@@ -44,6 +44,7 @@ module MsgProcessing
     use CPtr;
     use Reflection;
     use Logging;
+    use Unique;
     use ServerConfig;
     config const RSLSD_vv = false;
     const vv = RSLSD_vv; // these need to be const for comms/performance reasons
@@ -580,9 +581,11 @@ module MsgProcessing
         var name1E: borrowed GenSymEntry = st.lookup(name1);
         var name2E: borrowed GenSymEntry = st.lookup(name2);
         listOfArgsString = listOfArgsString.strip("[]");
-        listOfArgsString = listOfArgsString.replace(",","");
-        var split: [1..n] string = listOfArgsString.split(' ');
-        var listOfArgs: [1..n] int;
+        //writeln("prvi string: ",listOfArgsString);
+        //listOfArgsString = listOfArgsString.replace(",","");
+        var split: [0..n-1] string = listOfArgsString.split(",");
+        //writeln("prva lista: ",split);
+        var listOfArgs: [0..n-1] int;
         var k: int = 0;
         for s in split do {
             listOfArgs[k] = try! s:int;
@@ -590,48 +593,137 @@ module MsgProcessing
         }
         var a = toSymEntry(name1E, int);
         var b = toSymEntry(name2E, int);
-
-        var f1: func(int,int,int,int,int) = lambda(a: int, arg1: int, arg2: int, arg3: int) {
-             return (((a - arg1) / arg2) % arg3);
-        };
         var f2 = lambda(b: int, arg3: int) {
             return (b + arg3);
         };
         var kr0: [a.aD] (a.etype,int) = [(key,rank) in zip(a.a,a.aD)] (key,rank);
         var lock : sync bool;
-        forall loc in Locales {
-                on loc {
-                    forall task in Tasks {
-                        // bucket domain
-                        var bD = {0..#b.a.size};
-                        // allocate counts
-                        var taskBucketCounts: [bD] int;
-                        // get local domain's indices
-                        var lD = kr0.localSubdomain();
-                        // calc task's indices from local domain's indices
-                        var tD = calcBlock(task, lD.low, lD.high);
-                        try! rsLogger.debug(getModuleName(),getRoutineName(),getLineNumber(),
-                                   "locid: %t task: %t tD: %t".format(loc.id,task,tD));
-                        // count digits in this task's part of the array
-                        for i in tD {
-                            const (key,_) = kr0[i];
-                            var bucket = f1(key, listOfArgs[0], listOfArgs[1], listOfArgs[2]); // calc bucket from key
-                            taskBucketCounts[bucket] += listOfArgs[3];
-                        }
-                        // write counts in to global counts in transposed order
-                        for bucket in bD {
-                            lock.writeEF(true);
-                            b.a[bucket] = b.a[bucket] + taskBucketCounts[bucket];
-                            lock.reset();
-                        }
-                }//coforall task
-            }//on loc
-        }//coforall loc
+        var l1: sync bool;
+        try
+        {
+            coforall loc in Locales {
+                    on loc {
+                        coforall task in Tasks {
+                            // bucket domain
+                            var bD = {0..#b.a.size};
+                            // allocate counts
+                            var taskBucketCounts: [bD] int;
+                            // get local domain's indices
+                            var lD = kr0.localSubdomain();
+                            // calc task's indices from local domain's indices
+                            var tD = calcBlock(task, lD.low, lD.high);
+                            if (tD.low<a.a.size && tD.high<a.a.size && tD.low<=tD.high)
+                            { 
+                                try! rsLogger.debug(getModuleName(),getRoutineName(),getLineNumber(),
+                                        "locid: %t task: %t tD: %t".format(loc.id,task,tD));
+                                // count digits in this task's part of the array
+                                var f1: func(int,int,int,int,int) = lambda(a: int, arg1: int, arg2: int, arg3: int) {
+                                    return (((a - arg1) / arg2) % arg3);
+                                };
+                                for i in tD {
+                                    //lock.writeEF(true);
+                                    //var key = 1;
+                                    //var (key,_) = kr0[i];
+                                    //writeln(a.a[i]);
+                                    //writeln(listOfArgs[0]);
+                                    //writeln(listOfArgs[1]);
+                                    //writeln(listOfArgs[2]);
+                                    var bucket = f1(a.a[i], listOfArgs[0], listOfArgs[1], listOfArgs[2]); // calc bucket from key
+                                    //writeln(bucket);
+                                    taskBucketCounts[bucket] += listOfArgs[3];
+                                    //assert(lock.isFull, "Is not full!");
+                                    //var unlock = lock.readFE();
+                                }
+                                // write counts in to global counts in transposed order
+                                for bucket in bD {
+                                    lock.writeEF(true);
+                                    b.a[bucket] = b.a[bucket] + taskBucketCounts[bucket];
+                                    var unlock = lock.readFE();
+                                }
+                            }
+                    }//coforall task
+                }//on loc
+            }//coforall loc
+        }
+        catch
+        {
+            var errorMsg = unknownError("Wrong index");
+            omLogger.error(getModuleName(),getRoutineName(),getLineNumber(),errorMsg);
+            return new MsgTuple(errorMsg, MsgType.ERROR);
+        }
         repMsg = "updated %s".format(st.attrib(name1));
         return new MsgTuple(repMsg, MsgType.NORMAL);
     }
 
     /**
+
+    * Move records
+
+    **/
+    /*proc moveRecordsMsg(cmd: string, payload: string, st: borrowed SymTab): MsgTuple throws
+    {
+        param pn = Reflection.getRoutineName();
+        var repMsg: string; // response message
+        var (name1, name2, name3, nStr, listOfArgsString) = payload.splitMsgToTuple(5);
+        var ret: int = 0;
+        var n = try! nStr:int;
+        var name1E: borrowed GenSymEntry = st.lookup(name1);
+        var name2E: borrowed GenSymEntry = st.lookup(name2);
+        var name3E: borrowed GenSymEntry = st.lookup(name3);
+        listOfArgsString = listOfArgsString.strip("[]");
+        listOfArgsString = listOfArgsString.replace(",","");
+        var split: [0..n-1] string = listOfArgsString.split(' ');
+        var listOfArgs: [0..n-1] int;
+        var k: int = 0;
+        for s in split do {
+            listOfArgs[k] = try! s:int;
+            k = k+1;
+        }
+        var f1 = lambda(a: int, arg1: int, arg2: int, arg3: int) {
+             return (((a - arg1) / arg2) % arg3);
+        };
+        var f2 = lambda(b: int, arg3: int) {
+            return (b + arg3);
+        };
+        var a = toSymEntry(name1E, int);
+        var b = toSymEntry(name2E, int);
+        var c = toSymEntry(name3E, int);
+        var kr0: [a.aD] (a.etype,int) = [(key,rank) in zip(a.a,a.aD)] (key,rank);
+        var lock : sync bool;
+        var k0: [a.aD] a.etype = a.a;
+        coforall loc in Locales {
+                on loc {
+                    coforall task in Tasks {
+                        // bucket domain
+                        var bD = {0..#b.a.size};
+                        // allocate counts
+                        var taskBucketPos: [bD] int;
+                        // get local domain's indices
+                        var lD = k0.localSubdomain();
+                        // calc task's indices from local domain's indices
+                        var tD = calcBlock(task, lD.low, lD.high);
+                        // calc new position and put (key,rank) pair there in kr1
+                        {
+                            var aggregator = newDstAggregator((t,int));
+                            for i in tD {
+                                const (key,_) = kr0[i];
+                                var bucket = f1(a.a[i], listOfArgs[0], listOfArgs[1], listOfArgs[2]); // calc bucket from key
+                                lock.writeEF(true);
+                                var pos = b.a[bucket];
+                                b.a[bucket] += listOfArgs[3];
+                                aggregator.copy(c.a[pos], a.a[i]);
+                                var unlock = lock.readFE();
+                            }
+                            aggregator.flush();
+                        }
+                    }//coforall task
+            }//on loc
+        }//coforall loc
+        repMsg = "updated %s".format(st.attrib(name1));
+        return new MsgTuple(repMsg, MsgType.NORMAL);
+    }*/
+
+     /**
 
     * Move records
 
@@ -686,6 +778,20 @@ module MsgProcessing
         var a = toSymEntry(name1E, int);
         a.a = + scan a.a;
         repMsg = "updated %s".format(name1);
+        return new MsgTuple(repMsg, MsgType.NORMAL);
+    }
+
+    proc removeDuplicatesMsg(cmd: string, payload: string, st: borrowed SymTab): MsgTuple throws {
+        param pn = Reflection.getRoutineName();
+        var (name1) = payload.splitMsgToTuple(1);
+        var name1E: borrowed GenSymEntry = st.lookup(name1);
+        var a = toSymEntry(name1E, int);
+        var rname = st.nextName();
+        var helper = uniqueFromSorted(a.a, false);
+        var e = st.addEntry(rname, helper.size, int);
+        e.a=helper;
+        var repMsg: string = "created %s".format(st.attrib(rname));
+        omLogger.debug(getModuleName(),getRoutineName(),getLineNumber(),repMsg);
         return new MsgTuple(repMsg, MsgType.NORMAL);
     }
 }

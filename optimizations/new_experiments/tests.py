@@ -97,15 +97,17 @@ def uniqueFromSorted(array):
     return ret
 
 def union(a, b):
-    return uniqueFromSorted(radix_sort((concat(a,b))))
+    return ak.remove_duplicates(radix_sort(ak.concatenate([a,b])))
+    #return ak.remove_duplicates(radix_sort((ak.concatenate[a,b])))
 
 ak.connect(connect_url='tcp://andrej-X556UQ:5555')
-a = ak.randint(0, 10000, 10000)
-# b = ak.randint(0, 10000, 100)
+a = ak.randint(0, 10000, 100000)
+b = ak.randint(0, 10000, 100000)
 start = time.perf_counter()
-c = radix_sort(a)
-# c = ak.sort(a)
-# c=ak.union1d(a,b)
+#c = radix_sort(a)
+#c = ak.sort(a)
+#c=ak.union1d(a,b)
+c = union(a,b)
 print(c)
 end = time.perf_counter()
 print(f"union_v1 took {end - start:0.9f} seconds")
