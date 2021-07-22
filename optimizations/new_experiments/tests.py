@@ -100,7 +100,7 @@ def union(a, b):
     return uniqueFromSorted(radix_sort((concat(a,b))))
 
 ak.connect(connect_url='tcp://andrej-X556UQ:5555')
-a = ak.randint(0, 10000, 100)
+a = ak.randint(0, 10000, 10000)
 # b = ak.randint(0, 10000, 100)
 start = time.perf_counter()
 c = radix_sort(a)
