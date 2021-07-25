@@ -58,7 +58,6 @@ def triangle_count_scalar(L: np.ndarray, nblocks_m, nblocks_n, nblocks_l):
     bA = create_blocks_scalar(L, bm, bl)
     bB = create_blocks_scalar(L, bl, bn)
     bM = create_blocks_scalar(L, bm, bn)
-
     #mxm_result = ak.zeros(1, dtype=np.int64)
     #mxm_mask_result = ak.zeros(1, dtype=np.int64)
 
@@ -80,6 +79,9 @@ def triangle_count_scalar(L: np.ndarray, nblocks_m, nblocks_n, nblocks_l):
 
                 s += ak.sum((bA[i * nblocks_l + k] * bB[k * nblocks_n + j]) * bM[i * nblocks_n + j])
 
+    print(len(bA))
+    print(len(bA))
+    print(len(bA))
     return s
 
 def create_blocks_scalar(A: np.ndarray, row_size, col_size):
@@ -90,16 +92,15 @@ def create_blocks_scalar(A: np.ndarray, row_size, col_size):
     for r in range(num_rows):
         for c in range(num_cols):
             M = ak.randint(0, 100, 1)
-            count = count + 2
             out.append(M)
 
     return out
 
-x = array = np.random.randint(2, size=(4, 4))
+x = array = np.random.randint(2, size=(16, 16))
 
 ak.connect(connect_url='tcp://andrej-X556UQ:5555')
 start = time.perf_counter()
-print(triangle_count_scalar(x, 2, 2, 2))
+print(triangle_count_scalar(x, 16, 16, 16))
 # print(triangle_count_numpy(x, 2, 2, 2, False))
 end = time.perf_counter()
 print(f"triangle count took {end - start:0.9f} seconds")

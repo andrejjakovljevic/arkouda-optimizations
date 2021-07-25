@@ -36,7 +36,7 @@ clientLogger = getArkoudaLogger(name='Arkouda User Logger', logFormat='%(message
 print('{}'.format(pyfiglet.figlet_format('Arkouda')))
 print('Client Version: {}'.format(__version__)) # type: ignore
 
-queue_size: int = 2
+queue_size: int = 1
 
 q = Queue(queue_size)
 client_to_server_names = {}
@@ -585,8 +585,8 @@ def generic_msg(cmd: str, args: Union[str, bytes] = None, send_bytes: bool = Fal
         try:
             # Transform the args with client to server names
             args = transform_args(args)
-            # print("cmd=", cmd)
-            # print("args=",args)
+            print("cmd=", cmd)
+            print("args=",args)
             # Send the message
             if send_bytes:
                 repMsg = _send_binary_message(cmd=cmd,
@@ -613,7 +613,7 @@ def generic_msg(cmd: str, args: Union[str, bytes] = None, send_bytes: bool = Fal
                 if (num > maxNumServerVariables):
                     maxNumServerVariables = num
                     print("max_num=", maxNumServerVariables)
-            # print("repmsg=",repMsg)
+            print("repmsg=",repMsg)
             return repMsg
 
         except KeyboardInterrupt as e:

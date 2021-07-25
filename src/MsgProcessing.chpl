@@ -628,7 +628,7 @@ module MsgProcessing
                                     //writeln(listOfArgs[0]);
                                     //writeln(listOfArgs[1]);
                                     //writeln(listOfArgs[2]);
-                                    var bucket = f1(a.a[i], listOfArgs[0], listOfArgs[1], listOfArgs[2]); // calc bucket from key
+                                    var bucket = C.f1(a.a[i], listOfArgs[0], listOfArgs[1], listOfArgs[2]); // calc bucket from key
                                     //writeln(bucket);
                                     taskBucketCounts[bucket] += listOfArgs[3];
                                     //assert(lock.isFull, "Is not full!");
@@ -728,6 +728,18 @@ module MsgProcessing
     * Move records
 
     **/
+
+    module C
+    {
+        extern 
+        {
+            static long f1(long a, long arg1, long arg2, long arg3)
+            {
+                return (((a - arg1) / arg2) % arg3);
+            }
+        }
+    }
+
     proc moveRecordsMsg(cmd: string, payload: string, st: borrowed SymTab): MsgTuple throws
     {
         param pn = Reflection.getRoutineName();
@@ -759,7 +771,7 @@ module MsgProcessing
         a.a.reverse();
         var lock: sync bool;
         for k in a.a {
-            var ret: int = f1(k, listOfArgs[0], listOfArgs[1], listOfArgs[2]);
+            var ret: int = C.f1(k, listOfArgs[0], listOfArgs[1], listOfArgs[2]);
             // lock.writeEF(true);
             b.a[ret] = f2(b.a[ret], listOfArgs[3]);
             c.a[b.a[ret]] = k;

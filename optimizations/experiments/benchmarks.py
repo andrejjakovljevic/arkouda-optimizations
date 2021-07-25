@@ -1,6 +1,7 @@
 import arkouda as ak
 import numpy as np
 import time
+import random
 
 def triangle_count_numpy(L:np.ndarray, nblocks_m, nblocks_n, nblocks_l, verbose):
     """
@@ -171,19 +172,25 @@ def betweenness_centrality_1d():
     d = 0
     # int32t sum = 0 ;
     summation = 0
+    numIter = 0
+    random.seed()
+    r = 2
 
-    # Only doing one iteration
-    # GrB assign ( sigma , GrB NULL, GrB NULL, q , d , GrB ALL , n , GrB NULL ) ;
-    sigma[d] = q[d]
-    # GrB eWiseAdd ( p , GrB NULL, GrB NULL, GrB PLUS INT32 , p , q , GrB NULL ) ;
-    p = p + q
-    # GrB vxm ( q , p , GrB NULL, GrB PLUS TIMES SEMIRING INT32 ,q ,A, GrB DESC RC ) ;
-    q = q * A
-    # GrB reduce(&sum , GrB NULL, GrB PLUS MONOID INT32 , q , GrB NULL ) ;
-    summation = ak.sum(q)
-    # ++d ;
-    d += 4
-
+    while True:
+        # Only doing one iteration
+        # GrB assign ( sigma , GrB NULL, GrB NULL, q , d , GrB ALL , n , GrB NULL ) ;
+        sigma[d] = q[d]
+        # GrB eWiseAdd ( p , GrB NULL, GrB NULL, GrB PLUS INT32 , p , q , GrB NULL ) ;
+        p = p + q
+        # GrB vxm ( q , p , GrB NULL, GrB PLUS TIMES SEMIRING INT32 ,q ,A, GrB DESC RC ) ;
+        q = q * A
+        # GrB reduce(&sum , GrB NULL, GrB PLUS MONOID INT32 , q , GrB NULL ) ;
+        summation = ak.sum(q)
+        # ++d ;
+        d=d+1
+        if (d==r):
+            break
+    print("number of iterations:",d)
     # GrB Vector t 1 ; GrB Vector new(&t1 , GrB FP32 , n ) ; for t1-t4
     # t1 = ak.zeros(n, ak.int64)
     # t2 = ak.zeros(n, ak.int64)

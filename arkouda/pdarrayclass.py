@@ -2135,9 +2135,9 @@ def cache_array(arr: pdarray):
     #print("----MAP----")
     #for (key, value) in client_to_server_names.items():
     #    print("key=", key, "value=", value)
-    print("Caching ", client_to_server_names[arr.name], arr.size    )
+    # print("Caching ", client_to_server_names[arr.name], arr.size    )
     cache[arr.dtype][arr.size].add(client_to_server_names[arr.name])
-    # print('caching',client_to_server_names[arr.name])
+    print('caching',client_to_server_names[arr.name])
     client_to_server_names.pop(arr.name)
 
 
