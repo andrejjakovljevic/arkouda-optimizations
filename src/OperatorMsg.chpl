@@ -932,6 +932,8 @@ module OperatorMsg
                 var val = try! value:int;
                 var r = toSymEntry(right,int);
                 var s = toSymEntry(res, int);
+                s.hasMin=false;
+                s.hasMax=false;
                 select op
                 {
                     when "+" {
@@ -1746,6 +1748,8 @@ module OperatorMsg
                 var l = toSymEntry(left,int);
                 var r = toSymEntry(right,int);
                 var s = toSymEntry(res,int);
+                s.hasMin = false;
+                s.hasMax = false;
                 select op
                 {
                     when "+" {
@@ -1805,6 +1809,8 @@ module OperatorMsg
             when (DType.Int64, DType.Int64) {
                 var l = toSymEntry(left,int);
                 var s = toSymEntry(res,int);
+                s.hasMin = false;
+                s.hasMax = false;
                 var val = try! value:int;
                 select op
                 {

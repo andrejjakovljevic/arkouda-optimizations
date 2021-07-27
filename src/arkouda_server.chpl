@@ -26,6 +26,8 @@ const asLogger = new Logger(logLevel);
 
 var watch = new Time.Timer();
 watch.clear();
+var live: int = 0;
+var maxi: int = 0;
 
 proc initArkoudaDirectory() {
     var arkDirectory = '%s%s%s'.format(here.cwd(), pathSep,'.arkouda');
@@ -281,8 +283,8 @@ proc main() {
                 shutdown(user=user);
                 if (trace) {
                     asLogger.info(getModuleName(),getRoutineName(),getLineNumber(),
-                                         "<<< shutdown initiated by %s took %.17r sec, time spent creating stuff %.17r ms".format(user, 
-                                                   t1.elapsed() - s0, watch.elapsed(TimeUnits.milliseconds)));
+                                         "<<< shutdown initiated by %s took %.17r sec, time spent creating stuff %.17r ms, max live %i".format(user, 
+                                                   t1.elapsed() - s0, watch.elapsed(TimeUnits.milliseconds), maxi));
                 }
                 break;
             }

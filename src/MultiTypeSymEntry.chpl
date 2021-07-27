@@ -95,6 +95,10 @@ module MultiTypeSymEntry
         */
         var aD: makeDistDom(size).type;
         var a: [aD] etype;
+        var hasMax: bool = false;
+        var hasMin: bool = false; 
+        var min: etype = 0: etype;
+        var max: etype = 0: etype;
         
         /*
         This init takes length and element type
@@ -107,6 +111,8 @@ module MultiTypeSymEntry
         */
         proc init(len: int, type etype) {
             watch.start();
+            live = live + 1;
+            if (live>maxi) then maxi=live;
             super.init(etype, len);
             this.etype = etype;
             this.aD = makeDistDom(len);
@@ -121,6 +127,8 @@ module MultiTypeSymEntry
         */
         proc init(a: [?D] ?etype) {
             watch.start();
+            live = live + 1;
+            if (live>maxi) then maxi=live;
             super.init(etype, D.size);
             this.etype = etype;
             this.aD = D;

@@ -25,6 +25,7 @@ def move_records(a: pdarray, b: pdarray, c: pdarray, n: int, l: list) -> int:
     generic_msg(cmd, cmd_args, return_value_needed=False, my_pdarray=[a, b, c])
 
 def cumsum(a: pdarray):
+    a.properties.clear()
     cmd = "cumsum"
     cmd_args = "{}".format(a.name)
     generic_msg(cmd, cmd_args, return_value_needed=False, my_pdarray=[a])

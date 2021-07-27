@@ -65,12 +65,29 @@ module ReductionMsg
                         repMsg = "float64 %.17r".format(val);
                     }
                     when "min" {
-                      var val = min reduce e.a;
+                      var val = 0;
+                      if (e.hasMin) then {
+                        val = e.min;
+                      }
+                      else {
+                        val = min reduce e.a;
+                        e.hasMin = true;
+                        e.min = val;
+                      }
                       repMsg = "int64 %i".format(val);
                     }
                     when "max" {
-                        var val = max reduce e.a;
-                        repMsg = "int64 %i".format(val);
+                      var val = 0;
+                      if (e.hasMax) then {
+                        val = e.max;
+                      }
+                      else {
+                        val = max reduce e.a;
+                        e.hasMax = true;
+                        e.max = val;
+                      }
+                      
+                      repMsg = "int64 %i".format(val);
                     }
                     when "argmin" {
                         var (minVal, minLoc) = minloc reduce zip(e.a,e.aD);

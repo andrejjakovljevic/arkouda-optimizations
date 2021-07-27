@@ -128,6 +128,8 @@ module RandMsg
                 var aMax = aMaxStr:int;
                 var t1 = Time.getCurrentTime();
                 var s = toSymEntry(res,int);
+                s.hasMin=false;
+                s.hasMax=false;
                 randLogger.debug(getModuleName(),getRoutineName(),getLineNumber(),
                                    "alloc time = %i sec".format(Time.getCurrentTime() - t1));
 
@@ -141,6 +143,8 @@ module RandMsg
                 var aMax = aMaxStr:int;
                 var t1 = Time.getCurrentTime();
                 var s = toSymEntry(res, uint(8));
+                s.hasMin=false;
+                s.hasMax=false;
                 randLogger.debug(getModuleName(),getRoutineName(),getLineNumber(),
                                      "alloc time = %i sec".format(Time.getCurrentTime() - t1));
 
@@ -154,6 +158,8 @@ module RandMsg
                 var aMax = aMaxStr:real;
                 var t1 = Time.getCurrentTime();
                 var s = toSymEntry(res,real);
+                s.hasMin=false;
+                s.hasMax=false;
                 randLogger.debug(getModuleName(),getRoutineName(),getLineNumber(),
                                          "alloc time = %i sec".format(Time.getCurrentTime() - t1));
 
@@ -165,6 +171,8 @@ module RandMsg
             when (DType.Bool) {
                 var t1 = Time.getCurrentTime();
                 var s = toSymEntry(res,bool);
+                s.hasMin=false;
+                s.hasMax=false;
                 randLogger.debug(getModuleName(),getRoutineName(),getLineNumber(),
                                   "alloc time = %i sec".format(Time.getCurrentTime() - t1));
 

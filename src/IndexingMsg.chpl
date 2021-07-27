@@ -144,6 +144,8 @@ module IndexingMsg
         proc sliceHelper(type t) throws {
             var e = toSymEntry(gEnt,t);
             var a = toSymEntry(res,t);
+            a.hasMin=false;
+            a.hasMax=false;
             ref ea = e.a;
             ref aa = a.a;
             forall (elt,j) in zip(aa, slice) with (var agg = newSrcAggregator(t)) {

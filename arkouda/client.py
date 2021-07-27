@@ -36,7 +36,7 @@ clientLogger = getArkoudaLogger(name='Arkouda User Logger', logFormat='%(message
 print('{}'.format(pyfiglet.figlet_format('Arkouda')))
 print('Client Version: {}'.format(__version__)) # type: ignore
 
-queue_size: int = 1
+queue_size: int = 5
 
 q = Queue(queue_size)
 client_to_server_names = {}

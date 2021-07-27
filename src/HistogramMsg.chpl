@@ -37,8 +37,20 @@ module HistogramMsg
         // helper nested procedure
         proc histogramHelper(type t) throws {
           var e = toSymEntry(gEnt,t);
-          var aMin = min reduce e.a;
-          var aMax = max reduce e.a;
+          var aMin: e.etype = 0;
+          var aMax: e.etype = 0;
+          if (e.hasMin) then {
+            aMin = e.min;
+          }
+          else {
+            aMin = min reduce e.a;
+          }
+          if (e.hasMax) then {
+            aMax = e.max;
+          }
+          else {
+            aMax = max reduce e.a;
+          }
           var binWidth:real = (aMax - aMin):real / bins:real;
           hgmLogger.debug(getModuleName(),getRoutineName(),getLineNumber(),
                                                            "binWidth %r".format(binWidth));

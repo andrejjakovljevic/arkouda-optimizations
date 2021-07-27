@@ -178,6 +178,7 @@ module MultiTypeSymbolTable
         proc deleteEntry(name: string): bool throws {
             checkTable(name, "deleteEntry");
             if !registry.contains(name) {
+                live = live - 1;
                 mtLogger.debug(getModuleName(),getRoutineName(),getLineNumber(),
                                        "Deleting unregistered entry: %s".format(name)); 
                 tab.remove(name);

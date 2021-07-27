@@ -463,8 +463,9 @@ def histogram(pda : pdarray, bins : int_scalars=10) -> pdarray:
     """
     if bins < 1:
         raise ValueError('bins must be 1 or greater')
-    repMsg = generic_msg(cmd="histogram", args="{} {}".format(pda.name, bins))
-    return create_pdarray(type_cast(str,repMsg))
+    arr = pdarray("histogram", "{} {}".format(pda.name, bins), 'float64', bins, 1, [bins], pda.dtype.itemsize)
+    repMsg = generic_msg(cmd="histogram", args="{} {}".format(pda.name, bins), create_pdarray = True, arr_id = arr.name, my_pdarray = [arr, pda])
+    return arr
 
 @typechecked
 def value_counts(pda : pdarray) -> Union[Categorical, # type: ignore

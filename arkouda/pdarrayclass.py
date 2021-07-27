@@ -129,6 +129,7 @@ class pdarray:
         self.ndim = ndim
         self.shape = shape
         self.itemsize = itemsize
+        self.properties = {}
         names_to_weak_ref[self.name] = weakref.ref(self)
         if (cmd_args != ''):
             if (cmd=="binopvv"):
@@ -640,6 +641,7 @@ class pdarray:
             raise TypeError("Unhandled key type: {} ({})".format(key, type(key)))
 
     def __setitem__(self, key, value):
+        self.properties.clear()
         if np.isscalar(key) and resolve_scalar_dtype(key) == 'int64':
             orig_key = key
             if key < 0:
@@ -1481,8 +1483,10 @@ def sum(pda: pdarray) -> np.float64:
     RuntimeError
         Raised if there's a server-side error thrown
     """
-    repMsg = generic_msg(cmd="reduction", args="{} {}".format("sum", pda.name), return_value_needed=True, my_pdarray=[pda])
-    return parse_single_value(cast(str, repMsg))
+    if ('sum' not in pda.properties.keys()):
+        repMsg = generic_msg(cmd="reduction", args="{} {}".format("sum", pda.name), return_value_needed=True, my_pdarray=[pda])
+        pda.properties['sum'] = parse_single_value(cast(str, repMsg))
+    return pda.properties['sum']
 
 
 @typechecked
@@ -1534,8 +1538,10 @@ def min(pda: pdarray) -> numpy_scalars:
     RuntimeError
         Raised if there's a server-side error thrown
     """
-    repMsg = generic_msg(cmd="reduction", args="{} {}".format("min", pda.name), return_value_needed = True, arr_id=pda.name, my_pdarray=[pda])
-    return parse_single_value(cast(str, repMsg))
+    if ('min' not in pda.properties.keys()):
+        repMsg = generic_msg(cmd="reduction", args="{} {}".format("min", pda.name), return_value_needed = True, arr_id=pda.name, my_pdarray=[pda])
+        pda.properties['min'] = parse_single_value(cast(str, repMsg))
+    return pda.properties['min']
 
 
 @typechecked
@@ -1560,8 +1566,10 @@ def max(pda: pdarray) -> numpy_scalars:
     RuntimeError
         Raised if there's a server-side error thrown
     """
-    repMsg = generic_msg(cmd="reduction", args="{} {}".format("max", pda.name), return_value_needed = True, arr_id=pda.name, my_pdarray=[pda])
-    return parse_single_value(cast(str, repMsg))
+    if ('max' not in pda.properties.keys()):
+        repMsg = generic_msg(cmd="reduction", args="{} {}".format("max", pda.name), return_value_needed = True, arr_id=pda.name, my_pdarray=[pda])
+        pda.properties['max'] = parse_single_value(cast(str, repMsg))
+    return pda.properties['max']
 
 
 @typechecked

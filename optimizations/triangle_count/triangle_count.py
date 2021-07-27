@@ -96,11 +96,11 @@ def create_blocks_scalar(A: np.ndarray, row_size, col_size):
 
     return out
 
-x = array = np.random.randint(2, size=(16, 16))
+x = array = np.random.randint(2, size=(4, 4))
 
 ak.connect(connect_url='tcp://andrej-X556UQ:5555')
 start = time.perf_counter()
-print(triangle_count_scalar(x, 16, 16, 16))
+print(triangle_count_scalar(x, 2, 2, 2))
 # print(triangle_count_numpy(x, 2, 2, 2, False))
 end = time.perf_counter()
 print(f"triangle count took {end - start:0.9f} seconds")

@@ -130,8 +130,9 @@ module MsgProcessing
         var size = try! sizestr:int;
         var res: borrowed GenSymEntry = st.lookup(store);
         var s = toSymEntry(res,int);
-        coforall a in s.a do
-            a = 0;
+        s.a = 0;
+        s.hasMin = false;
+        s.hasMax = false;
         // if verbose print action
         mpLogger.debug(getModuleName(),getRoutineName(),getLineNumber(),
             "cmd: %s dtype: %s size: %i updated pdarray name: %s".format(
@@ -370,6 +371,8 @@ module MsgProcessing
                         cmd, start, stop, stride, len));
 
         var s = toSymEntry(res,int);
+        s.hasMin=false;
+        s.hasMax=false;
         var t1 = Time.getCurrentTime();
         ref sa = s.a;
         ref sad = s.aD;
@@ -593,6 +596,8 @@ module MsgProcessing
         }
         var a = toSymEntry(name1E, int);
         var b = toSymEntry(name2E, int);
+        b.hasMax = false;
+        b.hasMin = false;
         var f2 = lambda(b: int, arg3: int) {
             return (b + arg3);
         };
@@ -789,6 +794,8 @@ module MsgProcessing
         var name1E: borrowed GenSymEntry = st.lookup(name1);
         var a = toSymEntry(name1E, int);
         a.a = + scan a.a;
+        a.hasMin = false;
+        a.hasMax = false;
         repMsg = "updated %s".format(name1);
         return new MsgTuple(repMsg, MsgType.NORMAL);
     }
