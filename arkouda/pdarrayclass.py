@@ -4,7 +4,7 @@ from typing import cast, List, Sequence
 from typeguard import typechecked
 import json, struct
 import numpy as np  # type: ignore
-from arkouda.client import generic_msg, client_to_server_names, id_to_args, args_to_id
+from arkouda.client import generic_msg, client_to_server_names, id_to_args, args_to_id, find_last, delete_from_args_map, cache_array, cache
 from arkouda.dtypes import dtype, DTypes, resolve_scalar_dtype, \
     structDtypeCodes, translate_np_dtype, NUMBER_FORMAT_STRINGS, \
     int_scalars, numeric_scalars, numpy_scalars, int64
@@ -26,11 +26,6 @@ logger = getArkoudaLogger(name='pdarrayclass')
 
 array_count = 1
 
-# Default dictionary so you can access cached pdarrays as
-# cache[type of stored value][size of pdarray]
-cache = dict()
-cache[akint64] = defaultdict(set)
-cache[akfloat64] = defaultdict(set)
 names_to_weak_ref = {}
 
 @typechecked
@@ -137,7 +132,6 @@ class pdarray:
                 op = argss[0]
                 thing1 = argss[1]
                 thing2 = argss[2]
-                # print('things:'+op+":"+thing1+":"+thing2)
                 args_to_id[op+":"+thing1+":"+thing2] = weakref.ref(self)
                 if (self.name not in id_to_args):
                     id_to_args[self.name] = []
@@ -160,40 +154,11 @@ class pdarray:
                     id_to_args[self.name].append(op + ":" + thing2 + ":" + thing1)
 
     def __del__(self):
-        # try:
-        logger.debug('deleting pdarray with name {}'.format(self.name))
-        # delete all things that are in same arguments
-        all_deletions = []
-        keys = []
-        for key in args_to_id.keys():
-            bris = key.split(":")
-            if (self.name in bris):
-                if (args_to_id[key]() is not None):
-                    all_deletions.append(args_to_id[key]())
-                    keys.append(key)
-
-        # keys = []
-
-        if (self.name in id_to_args.keys()):
-            for nes in id_to_args[self.name]:
-                if nes in args_to_id.keys():
-                    del args_to_id[nes]
-            del id_to_args[self.name]
-
-        for dels in all_deletions:
-            for key in args_to_id.keys():
-                bris = key.split(":")
-                if (dels.name in bris):
-                    all_deletions.append(args_to_id[key]())
-                    keys.append(key)
-
-
-        for key in keys:
-            if (key in args_to_id.keys()):
-                #pass
-                del args_to_id[key]
-
-        cache_array(self)
+        # print('called del', self.name)
+        ret = find_last(self)
+        if (not ret):
+            delete_from_args_map(self.name)
+            cache_array(self.name, self.dtype, self.size)
 
     # except:
     #     pass
@@ -352,11 +317,13 @@ class pdarray:
 
     # overload + for pdarray, other can be {pdarray, int, float}
     def __add__(self, other):
+        #print("add=",self.name)
         if (isinstance(other,pdarray)):
             name = other.name
         else:
             dt = resolve_scalar_dtype(other)
             name = NUMBER_FORMAT_STRINGS[dt].format(other)
+        # print("+:"+self.name+":"+name)
         if (("+:"+self.name+":"+name) in args_to_id.keys()):
             return args_to_id[("+:"+self.name+":"+name)]()
         if (("+:" + name + ":" + self.name) in args_to_id.keys()):
@@ -407,9 +374,10 @@ class pdarray:
         else:
             dt = resolve_scalar_dtype(other)
             name = NUMBER_FORMAT_STRINGS[dt].format(other)
-        if (("*:"+self.name+":"+name) in args_to_id.keys()):
+        # print("*:"+self.name+":"+name)
+        if (("*:"+self.name+":"+name) in args_to_id.keys() and args_to_id[("*:"+self.name+":"+name)]() is not None):
             return args_to_id[("*:"+self.name+":"+name)]()
-        if (("*:" + name + ":" + self.name) in args_to_id.keys()):
+        if (("*:" + name + ":" + self.name) in args_to_id.keys() and args_to_id[("*:" + name + ":" + self.name)]() is not None):
             return args_to_id[("*:" + name + ":" + self.name)]()
         if check_arr(self.dtype, self.size):
             return binOpWithStore(self, other, uncache_array(self.dtype, self.size), "*")
@@ -2136,19 +2104,6 @@ class RegistrationError(Exception):
     """Error/Exception used when the Arkouda Server cannot register an object"""
 
 
-def cache_array(arr: pdarray):
-    # print("name=",arr.name)
-    if arr.name not in client_to_server_names.keys():
-        return;
-    #print("----MAP----")
-    #for (key, value) in client_to_server_names.items():
-    #    print("key=", key, "value=", value)
-    # print("Caching ", client_to_server_names[arr.name], arr.size    )
-    cache[arr.dtype][arr.size].add(client_to_server_names[arr.name])
-    print('caching',client_to_server_names[arr.name])
-    client_to_server_names.pop(arr.name)
-
-
 def check_arr(dtype, arr_size):
     # Make sure cache[dtype][arr_size] is not empty
     return dtype in cache and arr_size in cache[dtype] and cache[dtype][arr_size]
@@ -2166,5 +2121,4 @@ def create_pdarray_with_name(name: str, cmd: str, cmd_args: str,
                                 mydtype: np.dtype, size: int_scalars, ndim: int_scalars, shape: Sequence[int], itemsize: int_scalars):
     arr = pdarray(cmd, cmd_args, mydtype, size, ndim, shape, itemsize)
     client_to_server_names[arr.name]=name
-    # print("create with name",arr.name,name)
     return arr

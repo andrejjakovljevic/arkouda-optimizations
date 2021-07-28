@@ -149,15 +149,15 @@ def betweenness_centrality_1d():
     n = A.size
 
     # GrB Vector new ( delta , GrB_FP32 , n ) ;
-    delta = ak.zeros(n, ak.int64)
+    delta = ak.ones(n, ak.int64)
 
     # GrB Matrix sigma ;
     # GrB Matrix new(&sigma , GrB INT32 , n , n ) ;
-    sigma = ak.zeros(n, ak.int64)
+    sigma = ak.ones(n, ak.int64)
 
     # GrB Vector q ;
     # GrB Vector new(&q , GrB INT32 , n ) ;
-    q = ak.zeros(n, ak.int64)
+    q = ak.ones(n, ak.int64)
     # GrB Vector setElement ( q , 1 , s ) ;
     q[s] = 1
 

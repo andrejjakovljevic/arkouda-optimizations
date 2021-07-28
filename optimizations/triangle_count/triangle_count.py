@@ -91,7 +91,7 @@ def create_blocks_scalar(A: np.ndarray, row_size, col_size):
     count = 0
     for r in range(num_rows):
         for c in range(num_cols):
-            M = ak.randint(0, 100, 1)
+            M = ak.ones(1, dtype=ak.int64)
             out.append(M)
 
     return out
