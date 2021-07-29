@@ -12,7 +12,7 @@ import weakref
 from collections import defaultdict
 from arkouda.dtypes import int64 as akint64, float64 as akfloat64
 
-__all__ = ["connect", "disconnect", "shutdown", "get_config", "get_mem_used", "ruok", "generic_msg", "client_to_server_names"]
+__all__ = ["connect", "disconnect", "shutdown", "get_config", "get_mem_used", "ruok", "generic_msg", "client_to_server_names", "weakref"]
 
 # stuff for zmq connection
 pspStr = ''
@@ -45,6 +45,7 @@ client_to_server_names = {}
 id_to_args = {}
 args_to_id = {}
 names_to_number_of_live_references = {}
+names_to_weakref = {}
 
 # Default dictionary so you can access cached pdarrays as
 # cache[type of stored value][size of pdarray]
@@ -618,11 +619,6 @@ def generic_msg(cmd: str, args: Union[str, bytes] = None, send_bytes: bool = Fal
                 logger.debug(("created Chapel array with name: {} dtype: {} size: {} ndim: {} shape: {} " +
                               "itemsize: {}").format(name, mydtype, size, ndim, shape, itemsize))
                 client_to_server_names[arr_id] = name
-                num = int(name[3:])
-                global maxNumServerVariables
-                if (num > maxNumServerVariables):
-                    maxNumServerVariables = num
-                    #print("max_num=", maxNumServerVariables)
             # print("repmsg=",repMsg)
             return repMsg
 
@@ -731,7 +727,8 @@ def ruok() -> str:
 
 class BufferItem:
     def __init__(self, cmd: str, args: Union[str, bytes] = None, send_bytes: bool = False,
-                 recv_bytes: bool = False, create_pdarray: bool = False, pdarray_id: str = None, executed: bool = False, my_pd_array = None):
+                 recv_bytes: bool = False, create_pdarray: bool = False, pdarray_id: str = None, executed: bool = False, my_pd_array = None, 
+                 size = None, type= None):
         self.cmd = cmd
         self.args = args
         self.send_bytes = send_bytes
@@ -741,6 +738,8 @@ class BufferItem:
         self.dependencies = []
         self.executed = executed
         self.my_pd_array = []
+        self.size = size
+        self.type = type
 
 
     def __str__(self):
@@ -748,13 +747,31 @@ class BufferItem:
 
     def execute(self):
         # print("executing",self)
+        used = None
         self.executed = True
+        ret = False
+        ret = []
+        for info in self.my_pd_array:
+            ret.append(delete_from_args_map(info[0]))
+        for info in self.my_pd_array:
+            if (names_to_number_of_live_references[info[0]]==0):
+                if (self.cmd=="binopvv" or self.cmd=="binopvs" or self.cmd=="binopsv" or self.cmd=="arange" or self.cmd == "randint"):
+                    #print("Here!")
+                    if (info[1]==names_to_weakref[self.pdarray_id]().dtype and int(info[2])==names_to_weakref[self.pdarray_id]().size):
+                        self.cmd+='Store'
+                        self.args+=" "+info[0]
+                        self.create_pdarray=False
+                        names_to_weakref[self.pdarray_id]().cmd = self.cmd
+                        names_to_weakref[self.pdarray_id]().cmd_args=self.args
+                        client_to_server_names[self.pdarray_id]=client_to_server_names[info[0]]
+                        used = info[0]
+                        break
+
         retMsg = generic_msg(self.cmd, self.args, self.send_bytes, self.recv_bytes,
                     return_value_needed=True, create_pdarray=self.create_pdarray,
                     buff_emptying=True, arr_id=self.pdarray_id)
         for info in self.my_pd_array:
-            ret = delete_from_args_map(info[0])
-            if ret:
+            if (names_to_number_of_live_references[info[0]]==0 and info[0]!=used):
                 cache_array(info[0], info[1], info[2])
         return retMsg
 
@@ -842,6 +859,7 @@ def buff_empty_partial(size):
         return q.get().execute()
 
 def find_last(arr):
+    ret = False
     for q_elem in reversed(list(q.queue)):
         if (arr.name in q_elem.args.split(" ")):
             q_elem.my_pd_array.append((arr.name, arr.dtype, arr.size))
@@ -849,8 +867,8 @@ def find_last(arr):
                 names_to_number_of_live_references[arr.name] = 1
             else:
                 names_to_number_of_live_references[arr.name] = names_to_number_of_live_references[arr.name] + 1
-            return True
-    return False
+            ret = True
+    return ret
 
 def delete_from_args_map(arrName: str):
     # try:

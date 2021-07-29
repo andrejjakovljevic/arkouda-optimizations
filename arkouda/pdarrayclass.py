@@ -4,7 +4,7 @@ from typing import cast, List, Sequence
 from typeguard import typechecked
 import json, struct
 import numpy as np  # type: ignore
-from arkouda.client import generic_msg, client_to_server_names, id_to_args, args_to_id, find_last, delete_from_args_map, cache_array, cache
+from arkouda.client import generic_msg, client_to_server_names, id_to_args, args_to_id, find_last, delete_from_args_map, cache_array, cache, names_to_weakref
 from arkouda.dtypes import dtype, DTypes, resolve_scalar_dtype, \
     structDtypeCodes, translate_np_dtype, NUMBER_FORMAT_STRINGS, \
     int_scalars, numeric_scalars, numpy_scalars, int64
@@ -26,7 +26,6 @@ logger = getArkoudaLogger(name='pdarrayclass')
 
 array_count = 1
 
-names_to_weak_ref = {}
 
 @typechecked
 def parse_single_value(msg: str) -> object:
@@ -125,7 +124,7 @@ class pdarray:
         self.shape = shape
         self.itemsize = itemsize
         self.properties = {}
-        names_to_weak_ref[self.name] = weakref.ref(self)
+        names_to_weakref[self.name] = weakref.ref(self)
         if (cmd_args != ''):
             if (cmd=="binopvv"):
                 argss = cmd_args.split(' ')
