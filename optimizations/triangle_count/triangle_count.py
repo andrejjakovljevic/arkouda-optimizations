@@ -88,18 +88,21 @@ def create_blocks_scalar(A: np.ndarray, row_size, col_size):
     num_rows = A.shape[0] // row_size
     num_cols = A.shape[0] // col_size
     out = []
-    count = 0
+    count = 5
     for r in range(num_rows):
         for c in range(num_cols):
-            M = ak.ones(1, dtype=ak.int64)
+            # print('count=',count)
+            M = ak.arange(count, count+1, 1)
+            count = count + 1
             out.append(M)
 
     return out
 
-x = array = np.random.randint(2, size=(4, 4))
+x = np.random.randint(2, size=(4, 4))
 
 ak.connect(connect_url='tcp://andrej-X556UQ:5555')
 start = time.perf_counter()
+# print('nesto')
 print(triangle_count_scalar(x, 2, 2, 2))
 # print(triangle_count_numpy(x, 2, 2, 2, False))
 end = time.perf_counter()
