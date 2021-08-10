@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from typing import cast, List, Sequence
 from typeguard import typechecked
 import json, struct
@@ -28,7 +29,7 @@ array_count = 1
 
 # Default dictionary so you can access cached pdarrays as
 # cache[type of stored value][size of pdarray]
-cache = dict()
+cache = defaultdict(defaultdict)
 cache[akint64] = defaultdict(set)
 cache[akfloat64] = defaultdict(set)
 names_to_weak_ref = {}
@@ -193,6 +194,9 @@ class pdarray:
                 #pass
                 del args_to_id[key]
 
+        if (sys.meta_path is None):
+            return
+        print("thing=", client_to_server_names[self.name], self.dtype)
         cache_array(self)
 
     # except:
@@ -291,15 +295,18 @@ class pdarray:
             return arr
         # pdarray binop scalar
         dt = resolve_scalar_dtype(other)
+        myType = self.dtype
+        if (self.dtype==akfloat64 or type(other)==np.float64):
+            myType=akfloat64
         if dt not in DTypes:
             raise TypeError("Unhandled scalar type: {} ({})".format(other,
                                                                     type(other)))
         cmd = "binopvs"
         args = "{} {} {} {}". \
             format(op, self.name, dt, NUMBER_FORMAT_STRINGS[dt].format(other))
-        arr = pdarray(cmd=cmd, cmd_args=args, mydtype=self.dtype, size=self.size,
+        arr = pdarray(cmd=cmd, cmd_args=args, mydtype=myType, size=self.size,
                     ndim=1, shape=self.shape, itemsize=self.itemsize)
-        generic_msg(cmd=cmd, args=args, create_pdarray=True, arr_id=arr.name, my_pdarray=[self, other, arr])
+        generic_msg(cmd=cmd, args=args, create_pdarray=True, arr_id=arr.name, my_pdarray=[self, arr])
         return arr
 
     # reverse binary operators
@@ -361,8 +368,11 @@ class pdarray:
             return args_to_id[("+:"+self.name+":"+name)]()
         if (("+:" + name + ":" + self.name) in args_to_id.keys()):
             return args_to_id[("+:" + name + ":" + self.name)]()
-        if check_arr(self.dtype, self.size):
-            return binOpWithStore(self, other, uncache_array(self.dtype, self.size), "+")
+        myType = self.dtype
+        if (self.dtype==akfloat64 or type(other)==np.float64):
+            myType=akfloat64
+        if check_arr(myType, self.size):
+            return binOpWithStore(self, other, uncache_array(myType, self.size), "+")
         return self._binop(other, "+")
 
     def __radd__(self, other):
@@ -386,12 +396,12 @@ class pdarray:
             name = NUMBER_FORMAT_STRINGS[dt].format(other)
         if (("-:"+self.name+":"+name) in args_to_id.keys()):
             return args_to_id[("-:"+self.name+":"+name)]()
-        print('tip=', type(other))
+        # print('tip=', type(other))
         myType = self.dtype
-        if (self.dtype=='float64' or type(other)==np.float64):
-            myType='float64'
+        if (self.dtype==akfloat64 or type(other)==np.float64):
+            myType=akfloat64
         if check_arr(myType, self.size):
-            return binOpWithStore(self, other, uncache_array(self.dtype, self.size), "-")
+            return binOpWithStore(self, other, uncache_array(myType, self.size), "-")
         return self._binop(other, "-")
 
     def __rsub__(self, other):
@@ -415,8 +425,11 @@ class pdarray:
             return args_to_id[("*:"+self.name+":"+name)]()
         if (("*:" + name + ":" + self.name) in args_to_id.keys()):
             return args_to_id[("*:" + name + ":" + self.name)]()
-        if check_arr(self.dtype, self.size):
-            return binOpWithStore(self, other, uncache_array(self.dtype, self.size), "*")
+        myType = self.dtype
+        if (self.dtype==akfloat64 or type(other)==np.float64):
+            myType=akfloat64
+        if check_arr(myType, self.size):
+            return binOpWithStore(self, other, uncache_array(myType, self.size), "*")
         return self._binop(other, "*")
 
     def __rmul__(self, other):
@@ -491,6 +504,20 @@ class pdarray:
         return self._r_binop(other, "^")
 
     def __pow__(self, other):
+        if (isinstance(other,pdarray)):
+            name = other.name
+        else:
+            dt = resolve_scalar_dtype(other)
+            name = NUMBER_FORMAT_STRINGS[dt].format(other)
+        if (("**:"+self.name+":"+name) in args_to_id.keys()):
+            return args_to_id[("**:"+self.name+":"+name)]()
+        if (("**:" + name + ":" + self.name) in args_to_id.keys()):
+            return args_to_id[("**:" + name + ":" + self.name)]()
+        myType = self.dtype
+        if (self.dtype==akfloat64 or type(other)==np.float64):
+            myType=akfloat64
+        if check_arr(myType, self.size):
+            return binOpWithStore(self, other, uncache_array(myType, self.size), "**")
         return self._binop(other, "**")
 
     def __rpow__(self, other):
@@ -2083,10 +2110,12 @@ def binOpWithStore(pda_left: pdarray, pda_right: pdarray, pda_store_name: str, b
         return arr
     elif isinstance(pda_left, pdarray):
         dt = resolve_scalar_dtype(pda_right)
+        if (pda_left.dtype == akfloat64):
+            dt = 'float64'
         if dt not in DTypes:
             raise TypeError("Unhandled scalar type: {} ({})".format(pda_right, type(pda_right)))
         cmd = "binopvsStore"
-        arr = create_pdarray_with_name(pda_store_name, cmd, "", pda_left.dtype, pda_left.size, pda_left.ndim,
+        arr = create_pdarray_with_name(pda_store_name, cmd, "", (akfloat64 if (dt=="float64") else pda_left.dtype), pda_left.size, pda_left.ndim,
                                        pda_left.shape, pda_left.itemsize)
         args = "{} {} {} {} {}".format(binop, pda_left.name, dt, NUMBER_FORMAT_STRINGS[dt].format(pda_right), arr.name)
         arr.cmd_args = args
@@ -2105,6 +2134,8 @@ def binOpWithStore(pda_left: pdarray, pda_right: pdarray, pda_store_name: str, b
         return arr
     else:
         dt = resolve_scalar_dtype(pda_left)
+        if (pda_right.dtype == akfloat64):
+            dt = 'float64'
         if dt not in DTypes:
             raise TypeError("Unhandled scalar type: {} ({})".format(pda_right, type(pda_right)))
         cmd = "binopsvStore"
@@ -2145,7 +2176,9 @@ class RegistrationError(Exception):
 
 
 def cache_array(arr: pdarray):
-    # print("name=",arr.name)
+    if (sys.meta_path is None):
+        return
+    print(" cache type=", arr.dtype, "cache name=", arr.name, 'cache size=', arr.size)
     if arr.name not in client_to_server_names.keys():
         return;
     #print("----MAP----")
@@ -2153,7 +2186,7 @@ def cache_array(arr: pdarray):
     #    print("key=", key, "value=", value)
     # print("Caching ", client_to_server_names[arr.name], arr.size    )
     cache[arr.dtype][arr.size].add(client_to_server_names[arr.name])
-    print('caching',client_to_server_names[arr.name])
+    print('caching', client_to_server_names[arr.name])
     client_to_server_names.pop(arr.name)
 
 
