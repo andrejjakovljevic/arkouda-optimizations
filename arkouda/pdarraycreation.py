@@ -211,8 +211,20 @@ def array(a: Union[pdarray, np.ndarray, Iterable]) -> Union[pdarray, Strings]:
     fmt = ">{:n}{}".format(size, structDtypeCodes[a.dtype.name])
     req_msg = "{} {:n} ". \
                   format(a.dtype.name, size).encode() + struct.pack(fmt, *a)
-    repMsg = generic_msg(cmd='array', args=req_msg, send_bytes=True)
-    return create_pdarray(repMsg)
+    arr = pdarray('array', req_msg)
+    repMsg = generic_msg(cmd='array', args=req_msg, send_bytes=True, create_pdarray=True, return_value_needed=True, arr_id=arr.name, my_pdarray=[arr])
+    fields = repMsg.split()
+    mydtype = fields[2]
+    size = int(fields[3])
+    ndim = int(fields[4])
+    shape = [int(el) for el in fields[5][1:-1].split(',')]
+    itemsize = int(fields[6])
+    arr.dtype = mydtype
+    arr.size = size
+    arr.ndim = ndim
+    arr.shape = [size]
+    arr.itemsize = itemsize
+    return arr
 
 
 def zeros(size: int_scalars, dtype: type = np.float64) -> pdarray:

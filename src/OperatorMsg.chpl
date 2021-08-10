@@ -1828,10 +1828,118 @@ module OperatorMsg
                         ref la = l.a;
                         [(si,li) in zip(sa,la)] si = if val != 0 then li/val else 0;
                     }
+                    when "**" { 
+                        s.a= l.a**val;
+                    }
                     otherwise {
                         var errorMsg = notImplementedError(pn,left.dtype,op,dtype);
                         omLogger.error(getModuleName(),getRoutineName(),getLineNumber(),errorMsg);
                         return new MsgTuple(errorMsg, MsgType.ERROR);
+                    }
+                }
+            }
+            when (DType.Int64, DType.Float64) {
+                var l = toSymEntry(left,int);
+                var val = try! value:real;
+                var s = toSymEntry(res,real);
+                s.hasMin = false;
+                s.hasMax = false;
+                select op
+                {
+                    when "+" {
+                        s.a = l.a + val;
+                    }
+                    when "-" {
+                        s.a = l.a - val;
+                    }
+                    when "*" {
+                        s.a = l.a * val;
+                    }
+                    when "/" { // truediv
+                        s.a = l.a:real / val;
+                    } 
+                    when "//" { // floordiv
+                        ref sa = s.a;
+                        ref la = l.a;
+                        [(si,li) in zip(sa,la)] si = if val != 0 then floor(li:real / val) else NAN;
+                    }
+                    when "**" { 
+                        s.a= l.a**val;
+                    }
+                    otherwise {
+                        var errorMsg = notImplementedError(pn,left.dtype,op,dtype);
+                        omLogger.error(getModuleName(),getRoutineName(),getLineNumber(),errorMsg);                                
+                        return new MsgTuple(errorMsg, MsgType.ERROR);  
+                    }
+                }
+            }
+            when (DType.Float64, DType.Int64) {
+                var l = toSymEntry(left,real);
+                var s = toSymEntry(res,real);
+                var val = try! value:int;
+                s.hasMin = false;
+                s.hasMax = false;
+                select op
+                {
+                    when "+" {
+                        s.a = l.a + val;
+                    }
+                    when "-" {
+                        s.a = l.a - val;
+                    }
+                    when "*" {
+                        s.a = l.a * val;
+                    }
+                    when "/" { // truediv
+                        s.a = l.a / val:real;
+                    } 
+                    when "//" { // floordiv
+                        ref sa = s.a;
+                        ref la = l.a;
+                        [(si,li) in zip(sa,la)] si = if val != 0 then floor(li / val:real) else NAN;
+                    }
+                    when "**" { 
+                        s.a= l.a**val;
+                    }
+                    otherwise {
+                        var errorMsg = notImplementedError(pn,left.dtype,op,dtype);
+                        omLogger.error(getModuleName(),getRoutineName(),getLineNumber(),errorMsg);        
+                        return new MsgTuple(errorMsg, MsgType.ERROR);                         
+                    }
+                }
+            }
+            when (DType.Float64, DType.Float64) {
+                var l = toSymEntry(left,real);
+                var s = toSymEntry(res,real);
+                var val = try! value:real;
+                s.hasMin = false;
+                s.hasMax = false;
+                select op
+                {
+                    when "+" {
+                        s.a = l.a + val;
+                    }
+                    when "-" {
+                        s.a = l.a - val;
+                    }
+                    when "*" {
+                        s.a = l.a * val;
+                    }
+                    when "/" { // truediv
+                        s.a = l.a / val;
+                    } 
+                    when "//" { // floordiv
+                        ref sa = s.a;
+                        ref la = l.a;
+                        [(si,li) in zip(sa,la)] si = if val != 0 then floor(li / val) else NAN;
+                    }
+                    when "**" { 
+                        s.a= l.a**val;
+                    }
+                    otherwise {
+                        var errorMsg = notImplementedError(pn,left.dtype,op,dtype);
+                        omLogger.error(getModuleName(),getRoutineName(),getLineNumber(),errorMsg);                          
+                        return new MsgTuple(errorMsg, MsgType.ERROR);                             
                     }
                 }
             }

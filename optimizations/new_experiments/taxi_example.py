@@ -1,3 +1,4 @@
+import arkouda as ak
 import pandas as pd
 import numpy as np
 import math
@@ -19,6 +20,17 @@ def ak_create_akdict_from_df(df):
 def ns_to_min(v):
     return (v / (1e9 * 60.0))
 
+def cvt_to_int64(v):
+    try:
+        return np.int64(v)
+    except:
+        return np.int64(0) 
+
+def cvt_YN_to_bool(v):
+    if v == 'Y':
+        return True
+    else:
+        return False
 
 ak.connect(connect_url='tcp://andrej-X556UQ:5555')
 
@@ -31,7 +43,7 @@ cvt = {'VendorID': cvt_to_int64, 'passenger_count': cvt_to_int64, 'RatecodeID': 
 # explicitly parse date-time fields
 parse_dates_lst = ['tpep_pickup_datetime','tpep_dropoff_datetime']
 # call read_csv to parse data with these options
-ydf = pd.read_csv("./yellow_tripdata_2020-01.csv",
+ydf = pd.read_csv("/home/andrej/Documents/yellow_tripdata_2020-01.csv",
                   converters=cvt, header=0, low_memory=False,
                   parse_dates=parse_dates_lst, infer_datetime_format=True)
 

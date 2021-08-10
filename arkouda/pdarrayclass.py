@@ -116,9 +116,9 @@ class pdarray:
 
     __array_priority__ = 1000
 
-    def __init__(self, cmd: str, cmd_args: str, mydtype: np.dtype, size: int_scalars,
-                 ndim: int_scalars, shape: Sequence[int],
-                 itemsize: int_scalars) -> None:
+    def __init__(self, cmd: str, cmd_args: str, mydtype: np.dtype = None, size: int_scalars = None,
+                 ndim: int_scalars = None, shape: Sequence[int] = None,
+                 itemsize: int_scalars = None) -> None:
         global array_count
         self.name = "id_" + str(array_count)
         array_count += 1
@@ -299,7 +299,7 @@ class pdarray:
             format(op, self.name, dt, NUMBER_FORMAT_STRINGS[dt].format(other))
         arr = pdarray(cmd=cmd, cmd_args=args, mydtype=self.dtype, size=self.size,
                     ndim=1, shape=self.shape, itemsize=self.itemsize)
-        generic_msg(cmd=cmd, args=args, create_pdarray=True, arr_id=arr.name, my_pdarray=[self, arr])
+        generic_msg(cmd=cmd, args=args, create_pdarray=True, arr_id=arr.name, my_pdarray=[self, other, arr])
         return arr
 
     # reverse binary operators
@@ -386,7 +386,11 @@ class pdarray:
             name = NUMBER_FORMAT_STRINGS[dt].format(other)
         if (("-:"+self.name+":"+name) in args_to_id.keys()):
             return args_to_id[("-:"+self.name+":"+name)]()
-        if check_arr(self.dtype, self.size):
+        print('tip=', type(other))
+        myType = self.dtype
+        if (self.dtype=='float64' or type(other)==np.float64):
+            myType='float64'
+        if check_arr(myType, self.size):
             return binOpWithStore(self, other, uncache_array(self.dtype, self.size), "-")
         return self._binop(other, "-")
 
@@ -1694,6 +1698,10 @@ def var(pda: pdarray, ddof: int_scalars = 0) -> np.float64:
     if ddof >= pda.size:
         raise ValueError("var: ddof must be less than number of values")
     m = mean(pda)
+    # print('m=',m)    
+    ret = ((pda - m) ** 2).sum() / (pda.size - ddof)
+    # print('ret=',ret)
+    return ret
     return ((pda - m) ** 2).sum() / (pda.size - ddof)
 
 

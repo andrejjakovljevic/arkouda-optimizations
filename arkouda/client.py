@@ -571,7 +571,7 @@ def generic_msg(cmd: str, args: Union[str, bytes] = None, send_bytes: bool = Fal
                                 pdarray_id=arr_id,
                                 my_pd_array=my_pdarray)
 
-    if return_value_needed and not buff_emptying:
+    if return_value_needed and not buff_emptying and not send_bytes:
         ret = buff_push(buff_item)
         if (q.empty()):
             return ret
@@ -584,14 +584,16 @@ def generic_msg(cmd: str, args: Union[str, bytes] = None, send_bytes: bool = Fal
     if buff_emptying or return_value_needed:
         try:
             # Transform the args with client to server names
-            args = transform_args(args)
-            print("cmd=", cmd)
-            print("args=",args)
+            if not send_bytes:
+                args = transform_args(args)
+            #print("cmd=", cmd)
+            #print("args=",args)
             # Send the message
             if send_bytes:
                 repMsg = _send_binary_message(cmd=cmd,
                                               payload=cast(bytes, args),
                                               recv_bytes=recv_bytes)
+                return repMsg
             else:
                 repMsg = _send_string_message(cmd=cmd,
                                               args=cast(str, args),
