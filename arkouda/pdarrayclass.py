@@ -2153,7 +2153,7 @@ def check_arr(dtype, arr_size):
 def uncache_array(dtype, arr_size):
     if check_arr(dtype, arr_size):
         arr = cache[dtype][arr_size].pop()
-        print("Uncaching ", arr, arr_size)
+        # print("Uncaching ", arr, arr_size)
         # print("New cache length ", len(cache[dtype][arr_size]))
         return arr
 
