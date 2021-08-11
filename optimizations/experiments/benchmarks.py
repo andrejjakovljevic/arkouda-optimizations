@@ -174,7 +174,7 @@ def betweenness_centrality_1d():
     summation = 0
     numIter = 0
     random.seed()
-    r = 5
+    r = 2
 
     while True:
         # Only doing one iteration

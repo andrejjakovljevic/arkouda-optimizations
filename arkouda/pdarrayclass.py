@@ -27,13 +27,6 @@ logger = getArkoudaLogger(name='pdarrayclass')
 
 array_count = 1
 
-# Default dictionary so you can access cached pdarrays as
-# cache[type of stored value][size of pdarray]
-cache = defaultdict(defaultdict)
-cache[akint64] = defaultdict(set)
-cache[akfloat64] = defaultdict(set)
-names_to_weak_ref = {}
-
 @typechecked
 def parse_single_value(msg: str) -> object:
     """
@@ -398,6 +391,7 @@ class pdarray:
         myType = self.dtype
         if (self.dtype==akfloat64 or type(other)==np.float64):
             myType=akfloat64
+        # print('mul type ',myType,' size ', self.size)
         if check_arr(myType, self.size):
             return binOpWithStore(self, other, uncache_array(myType, self.size), "*")
         return self._binop(other, "*")
@@ -2151,13 +2145,15 @@ class RegistrationError(Exception):
 
 def check_arr(dtype, arr_size):
     # Make sure cache[dtype][arr_size] is not empty
+    #if (dtype in cache):
+    #    print(cache[dtype])
     return dtype in cache and arr_size in cache[dtype] and cache[dtype][arr_size]
 
 
 def uncache_array(dtype, arr_size):
     if check_arr(dtype, arr_size):
         arr = cache[dtype][arr_size].pop()
-        # print("Uncaching ", arr, arr_size)
+        print("Uncaching ", arr, arr_size)
         # print("New cache length ", len(cache[dtype][arr_size]))
         return arr
 

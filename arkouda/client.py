@@ -11,6 +11,7 @@ from queue import Queue
 import weakref
 from collections import defaultdict
 from arkouda.dtypes import int64 as akint64, float64 as akfloat64
+import sys
 
 __all__ = ["connect", "disconnect", "shutdown", "get_config", "get_mem_used", "ruok", "generic_msg", "client_to_server_names", "weakref"]
 
@@ -38,7 +39,7 @@ clientLogger = getArkoudaLogger(name='Arkouda User Logger', logFormat='%(message
 print('{}'.format(pyfiglet.figlet_format('Arkouda')))
 print('Client Version: {}'.format(__version__)) # type: ignore
 
-queue_size: int = 1
+queue_size: int = 6
 
 q = Queue(queue_size)
 client_to_server_names = {}
@@ -921,5 +922,4 @@ def cache_array(arrName: str, arrType, arrSize):
     #    print("key=", key, "value=", value)
     # print("Caching ", client_to_server_names[arr.name], arr.size    )
     cache[arrType][arrSize].add(client_to_server_names[arrName])
-    # print('caching',client_to_server_names[arrName])
     client_to_server_names.pop(arrName)
