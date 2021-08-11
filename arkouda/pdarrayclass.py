@@ -609,6 +609,10 @@ class pdarray:
 
     def __setitem__(self, key, value):
         self.properties.clear()
+        if (self.name in id_to_args.keys()):
+            for args in id_to_args[self.name]:
+                del args_to_id[args]
+        id_to_args[self.name] = []
         if np.isscalar(key) and resolve_scalar_dtype(key) == 'int64':
             orig_key = key
             if key < 0:
@@ -2111,7 +2115,7 @@ def check_arr(dtype, arr_size):
 def uncache_array(dtype, arr_size):
     if check_arr(dtype, arr_size):
         arr = cache[dtype][arr_size].pop()
-        print("Uncaching ", arr, arr_size)
+        # print("Uncaching ", arr, arr_size)
         # print("New cache length ", len(cache[dtype][arr_size]))
         return arr
 

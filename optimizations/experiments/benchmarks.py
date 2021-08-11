@@ -140,7 +140,7 @@ def betweenness_centrality_1d():
     #ak.connect(connect_url='tcp://MacBook-Pro.local:5555')
 
     # GrB_Matrix A
-    A = ak.zeros(50, ak.int64)
+    A = ak.ones(50, ak.int64)
     # GrB_Index s
     s = 2
 
@@ -149,15 +149,15 @@ def betweenness_centrality_1d():
     n = A.size
 
     # GrB Vector new ( delta , GrB_FP32 , n ) ;
-    delta = ak.zeros(n, ak.int64)
+    delta = ak.ones(n, ak.int64)
 
     # GrB Matrix sigma ;
     # GrB Matrix new(&sigma , GrB INT32 , n , n ) ;
-    sigma = ak.zeros(n, ak.int64)
+    sigma = ak.ones(n, ak.int64)
 
     # GrB Vector q ;
     # GrB Vector new(&q , GrB INT32 , n ) ;
-    q = ak.zeros(n, ak.int64)
+    q = ak.ones(n, ak.int64)
     # GrB Vector setElement ( q , 1 , s ) ;
     q[s] = 1
 
@@ -174,7 +174,7 @@ def betweenness_centrality_1d():
     summation = 0
     numIter = 0
     random.seed()
-    r = 2
+    r = 5
 
     while True:
         # Only doing one iteration

@@ -918,5 +918,5 @@ def cache_array(arrName: str, arrType, arrSize):
     #    print("key=", key, "value=", value)
     # print("Caching ", client_to_server_names[arr.name], arr.size    )
     cache[arrType][arrSize].add(client_to_server_names[arrName])
-    print('caching',client_to_server_names[arrName])
+    # print('caching',client_to_server_names[arrName])
     client_to_server_names.pop(arrName)
