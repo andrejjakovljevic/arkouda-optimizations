@@ -6,7 +6,6 @@ import matplotlib.pyplot as plt
 import gc
 import time
 
-
 def ak_create_akdict_from_df(df):
     akdict = {}
     for cname in df.keys():

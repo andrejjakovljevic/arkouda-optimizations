@@ -9,8 +9,10 @@ from arkouda.message import RequestMessage, MessageFormat, ReplyMessage, \
     MessageType
 from queue import Queue
 import weakref
+from collections import defaultdict
+from arkouda.dtypes import int64 as akint64, float64 as akfloat64
 
-__all__ = ["connect", "disconnect", "shutdown", "get_config", "get_mem_used", "ruok", "generic_msg", "client_to_server_names"]
+__all__ = ["connect", "disconnect", "shutdown", "get_config", "get_mem_used", "ruok", "generic_msg", "client_to_server_names", "weakref"]
 
 # stuff for zmq connection
 pspStr = ''
@@ -42,6 +44,14 @@ q = Queue(queue_size)
 client_to_server_names = {}
 id_to_args = {}
 args_to_id = {}
+names_to_number_of_live_references = {}
+names_to_weakref = {}
+
+# Default dictionary so you can access cached pdarrays as
+# cache[type of stored value][size of pdarray]
+cache = dict()
+cache[akint64] = defaultdict(set)
+cache[akfloat64] = defaultdict(set)
 
 # reset settings to default values
 def set_defaults() -> None:
@@ -610,12 +620,7 @@ def generic_msg(cmd: str, args: Union[str, bytes] = None, send_bytes: bool = Fal
                 logger.debug(("created Chapel array with name: {} dtype: {} size: {} ndim: {} shape: {} " +
                               "itemsize: {}").format(name, mydtype, size, ndim, shape, itemsize))
                 client_to_server_names[arr_id] = name
-                num = int(name[3:])
-                global maxNumServerVariables
-                if (num > maxNumServerVariables):
-                    maxNumServerVariables = num
-                    #print("max_num=", maxNumServerVariables)
-            #print("repmsg=",repMsg)
+            # print("repmsg=",repMsg)
             return repMsg
 
         except KeyboardInterrupt as e:
@@ -723,7 +728,8 @@ def ruok() -> str:
 
 class BufferItem:
     def __init__(self, cmd: str, args: Union[str, bytes] = None, send_bytes: bool = False,
-                 recv_bytes: bool = False, create_pdarray: bool = False, pdarray_id: str = None, executed: bool = False, my_pd_array = None):
+                 recv_bytes: bool = False, create_pdarray: bool = False, pdarray_id: str = None, executed: bool = False, my_pd_array = None, 
+                 size = None, type= None):
         self.cmd = cmd
         self.args = args
         self.send_bytes = send_bytes
@@ -732,17 +738,43 @@ class BufferItem:
         self.pdarray_id = pdarray_id
         self.dependencies = []
         self.executed = executed
-        self.my_pd_array = my_pd_array
+        self.my_pd_array = []
+        self.size = size
+        self.type = type
 
 
     def __str__(self):
         return "Buffer Item, Cmd={0}, Args={1}, Pdarray_id={2}".format(self.cmd, self.args, self.pdarray_id)
 
     def execute(self):
+        # print("executing",self)
+        used = None
         self.executed = True
-        return generic_msg(self.cmd, self.args, self.send_bytes, self.recv_bytes,
+        ret = False
+        ret = []
+        for info in self.my_pd_array:
+            ret.append(delete_from_args_map(info[0]))
+        for info in self.my_pd_array:
+            if (names_to_number_of_live_references[info[0]]==0):
+                if (self.cmd=="binopvv" or self.cmd=="binopvs" or self.cmd=="binopsv" or self.cmd=="arange" or self.cmd == "randint"):
+                    #print("Here!")
+                    if (info[1]==names_to_weakref[self.pdarray_id]().dtype and int(info[2])==names_to_weakref[self.pdarray_id]().size):
+                        self.cmd+='Store'
+                        self.args+=" "+info[0]
+                        self.create_pdarray=False
+                        names_to_weakref[self.pdarray_id]().cmd = self.cmd
+                        names_to_weakref[self.pdarray_id]().cmd_args=self.args
+                        client_to_server_names[self.pdarray_id]=client_to_server_names[info[0]]
+                        used = info[0]
+                        break
+
+        retMsg = generic_msg(self.cmd, self.args, self.send_bytes, self.recv_bytes,
                     return_value_needed=True, create_pdarray=self.create_pdarray,
                     buff_emptying=True, arr_id=self.pdarray_id)
+        for info in self.my_pd_array:
+            if (names_to_number_of_live_references[info[0]]==0 and info[0]!=used):
+                cache_array(info[0], info[1], info[2])
+        return retMsg
 
 def buff_push(item: BufferItem):
     #item.args=transform_args(item.args)
@@ -826,3 +858,68 @@ def buff_empty():
 def buff_empty_partial(size):
     while q.qsize() > size:
         return q.get().execute()
+
+def find_last(arr):
+    ret = False
+    for q_elem in reversed(list(q.queue)):
+        if (arr.name in q_elem.args.split(" ")):
+            q_elem.my_pd_array.append((arr.name, arr.dtype, arr.size))
+            if (arr.name not in names_to_number_of_live_references.keys()):
+                names_to_number_of_live_references[arr.name] = 1
+            else:
+                names_to_number_of_live_references[arr.name] = names_to_number_of_live_references[arr.name] + 1
+            ret = True
+    return ret
+
+def delete_from_args_map(arrName: str):
+    # try:
+    logger.debug('deleting pdarray with name {}'.format(arrName))
+    # delete all things that are in same arguments
+    if (arrName in names_to_number_of_live_references.keys()):
+        names_to_number_of_live_references[arrName] = names_to_number_of_live_references[arrName] - 1
+    if (arrName in names_to_number_of_live_references.keys() and names_to_number_of_live_references[arrName]!=0):
+        return False
+    all_deletions = []
+    keys = []
+    for key in args_to_id.keys():
+        bris = key.split(":")
+        if (arrName in bris):
+            if (args_to_id[key]() is not None):
+                all_deletions.append(args_to_id[key]())
+                keys.append(key)
+
+    # keys = []
+
+    if (arrName in id_to_args.keys()):
+        for nes in id_to_args[arrName]:
+            if nes in args_to_id.keys():
+                del args_to_id[nes]
+        del id_to_args[arrName]
+
+    for dels in all_deletions:
+        for key in args_to_id.keys():
+            bris = key.split(":")
+            if (dels.name in bris):
+                all_deletions.append(args_to_id[key]())
+                keys.append(key)
+
+    for key in keys:
+        if (key in args_to_id.keys()):
+            #pass
+            del args_to_id[key]
+    return True
+    
+
+def cache_array(arrName: str, arrType, arrSize):
+    if (sys.meta_path is None):
+        return
+    # print("name=",arr.name)
+    if arrName not in client_to_server_names.keys():
+        return;
+    #print("----MAP----")
+    #for (key, value) in client_to_server_names.items():
+    #    print("key=", key, "value=", value)
+    # print("Caching ", client_to_server_names[arr.name], arr.size    )
+    cache[arrType][arrSize].add(client_to_server_names[arrName])
+    # print('caching',client_to_server_names[arrName])
+    client_to_server_names.pop(arrName)

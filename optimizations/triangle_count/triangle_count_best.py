@@ -107,14 +107,12 @@ x = np.array([[0, 0, 0, 0],
 
 ak.connect(connect_url='tcp://andrej-X556UQ:5555')
 start = time.perf_counter()
-a = ak.arange(0, 5, 1)
-c = ak.arange(5, 10, 1)
-b = a+c
-print(b)
-d = (a+c)*(a+c)
-print(d)
-e = b*d
-print(e)
+d = ak.arange(10, 15, 1)
+#print(b)
+for i in range(2):
+    d = 3 * (d+d)
+print('array=', d)
+# print('nes=', d.name)
 end = time.perf_counter()
 print(f"triangle count took {end - start:0.9f} seconds")
 # ak.disconnect()

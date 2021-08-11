@@ -5,7 +5,7 @@ from typing import cast, List, Sequence
 from typeguard import typechecked
 import json, struct
 import numpy as np  # type: ignore
-from arkouda.client import generic_msg, client_to_server_names, id_to_args, args_to_id
+from arkouda.client import generic_msg, client_to_server_names, id_to_args, args_to_id, find_last, delete_from_args_map, cache_array, cache, names_to_weakref
 from arkouda.dtypes import dtype, DTypes, resolve_scalar_dtype, \
     structDtypeCodes, translate_np_dtype, NUMBER_FORMAT_STRINGS, \
     int_scalars, numeric_scalars, numpy_scalars, int64
@@ -131,14 +131,13 @@ class pdarray:
         self.shape = shape
         self.itemsize = itemsize
         self.properties = {}
-        names_to_weak_ref[self.name] = weakref.ref(self)
+        names_to_weakref[self.name] = weakref.ref(self)
         if (cmd_args != ''):
             if (cmd=="binopvv"):
                 argss = cmd_args.split(' ')
                 op = argss[0]
                 thing1 = argss[1]
                 thing2 = argss[2]
-                # print('things:'+op+":"+thing1+":"+thing2)
                 args_to_id[op+":"+thing1+":"+thing2] = weakref.ref(self)
                 if (self.name not in id_to_args):
                     id_to_args[self.name] = []
@@ -161,43 +160,11 @@ class pdarray:
                     id_to_args[self.name].append(op + ":" + thing2 + ":" + thing1)
 
     def __del__(self):
-        # try:
-        logger.debug('deleting pdarray with name {}'.format(self.name))
-        # delete all things that are in same arguments
-        all_deletions = []
-        keys = []
-        for key in args_to_id.keys():
-            bris = key.split(":")
-            if (self.name in bris):
-                if (args_to_id[key]() is not None):
-                    all_deletions.append(args_to_id[key]())
-                    keys.append(key)
-
-        # keys = []
-
-        if (self.name in id_to_args.keys()):
-            for nes in id_to_args[self.name]:
-                if nes in args_to_id.keys():
-                    del args_to_id[nes]
-            del id_to_args[self.name]
-
-        for dels in all_deletions:
-            for key in args_to_id.keys():
-                bris = key.split(":")
-                if (dels.name in bris):
-                    all_deletions.append(args_to_id[key]())
-                    keys.append(key)
-
-
-        for key in keys:
-            if (key in args_to_id.keys()):
-                #pass
-                del args_to_id[key]
-
-        if (sys.meta_path is None):
-            return
-        print("thing=", client_to_server_names[self.name], self.dtype)
-        cache_array(self)
+        # print('called del', self.name)
+        ret = find_last(self)
+        if (not ret):
+            delete_from_args_map(self.name)
+            cache_array(self.name, self.dtype, self.size)
 
     # except:
     #     pass
@@ -359,11 +326,13 @@ class pdarray:
 
     # overload + for pdarray, other can be {pdarray, int, float}
     def __add__(self, other):
+        #print("add=",self.name)
         if (isinstance(other,pdarray)):
             name = other.name
         else:
             dt = resolve_scalar_dtype(other)
             name = NUMBER_FORMAT_STRINGS[dt].format(other)
+        # print("+:"+self.name+":"+name)
         if (("+:"+self.name+":"+name) in args_to_id.keys()):
             return args_to_id[("+:"+self.name+":"+name)]()
         if (("+:" + name + ":" + self.name) in args_to_id.keys()):
@@ -421,9 +390,10 @@ class pdarray:
         else:
             dt = resolve_scalar_dtype(other)
             name = NUMBER_FORMAT_STRINGS[dt].format(other)
-        if (("*:"+self.name+":"+name) in args_to_id.keys()):
+        # print("*:"+self.name+":"+name)
+        if (("*:"+self.name+":"+name) in args_to_id.keys() and args_to_id[("*:"+self.name+":"+name)]() is not None):
             return args_to_id[("*:"+self.name+":"+name)]()
-        if (("*:" + name + ":" + self.name) in args_to_id.keys()):
+        if (("*:" + name + ":" + self.name) in args_to_id.keys() and args_to_id[("*:" + name + ":" + self.name)]() is not None):
             return args_to_id[("*:" + name + ":" + self.name)]()
         myType = self.dtype
         if (self.dtype==akfloat64 or type(other)==np.float64):
@@ -673,6 +643,10 @@ class pdarray:
 
     def __setitem__(self, key, value):
         self.properties.clear()
+        if (self.name in id_to_args.keys()):
+            for args in id_to_args[self.name]:
+                del args_to_id[args]
+        id_to_args[self.name] = []
         if np.isscalar(key) and resolve_scalar_dtype(key) == 'int64':
             orig_key = key
             if key < 0:
@@ -2175,21 +2149,6 @@ class RegistrationError(Exception):
     """Error/Exception used when the Arkouda Server cannot register an object"""
 
 
-def cache_array(arr: pdarray):
-    if (sys.meta_path is None):
-        return
-    print(" cache type=", arr.dtype, "cache name=", arr.name, 'cache size=', arr.size)
-    if arr.name not in client_to_server_names.keys():
-        return;
-    #print("----MAP----")
-    #for (key, value) in client_to_server_names.items():
-    #    print("key=", key, "value=", value)
-    # print("Caching ", client_to_server_names[arr.name], arr.size    )
-    cache[arr.dtype][arr.size].add(client_to_server_names[arr.name])
-    print('caching', client_to_server_names[arr.name])
-    client_to_server_names.pop(arr.name)
-
-
 def check_arr(dtype, arr_size):
     # Make sure cache[dtype][arr_size] is not empty
     return dtype in cache and arr_size in cache[dtype] and cache[dtype][arr_size]
@@ -2198,7 +2157,7 @@ def check_arr(dtype, arr_size):
 def uncache_array(dtype, arr_size):
     if check_arr(dtype, arr_size):
         arr = cache[dtype][arr_size].pop()
-        print("Uncaching ", arr, arr_size)
+        # print("Uncaching ", arr, arr_size)
         # print("New cache length ", len(cache[dtype][arr_size]))
         return arr
 
@@ -2207,5 +2166,4 @@ def create_pdarray_with_name(name: str, cmd: str, cmd_args: str,
                                 mydtype: np.dtype, size: int_scalars, ndim: int_scalars, shape: Sequence[int], itemsize: int_scalars):
     arr = pdarray(cmd, cmd_args, mydtype, size, ndim, shape, itemsize)
     client_to_server_names[arr.name]=name
-    # print("create with name",arr.name,name)
     return arr
