@@ -36,7 +36,7 @@ def cvt_YN_to_bool(v):
         return False
 
 
-ak.connect(connect_url='tcp://andrej-X556UQ:5555')
+ak.connect(connect_url='tcp://nlogin1:5555')
 
 # Read in yellow taxi data
 # per yellow data dictionary convert to data types Arkouda can handle
@@ -44,20 +44,14 @@ ak.connect(connect_url='tcp://andrej-X556UQ:5555')
 cvt = {'VendorID': cvt_to_int64, 'passenger_count': cvt_to_int64, 'RatecodeID': cvt_to_int64,
        'store_and_fwd_flag': cvt_YN_to_bool,
        'PULocationID': cvt_to_int64, 'DOLocationID': cvt_to_int64, 'payment_type': cvt_to_int64}
-# explicitly parse date-time fields
-parse_dates_lst = ['tpep_pickup_datetime', 'tpep_dropoff_datetime']
-# call read_csv to parse data with these options
-ydf = pd.read_csv("/home/andrej/Documents/yellow_tripdata_2020-01.csv",
-                  converters=cvt, header=0, low_memory=False,
-                  parse_dates=parse_dates_lst, infer_datetime_format=True)
 
-akdict = ak_create_akdict_from_df(ydf)
+akdict = ak.make_from_csv("/home/an58/yellow_tripdata_2020-01.csv", cvt)
 # take delta for ride duration
 ride_duration = akdict['tpep_dropoff_datetime'] - akdict['tpep_pickup_datetime']
 # pull out ride duration in minutes
 ride_duration = ns_to_min(ride_duration)
 start = time.perf_counter()
-for i in range(3):
+for i in range(1):
     min1 = ride_duration.min()
     max1 = ride_duration.max()
     m1 = ride_duration.mean()

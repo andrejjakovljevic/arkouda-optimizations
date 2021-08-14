@@ -10,8 +10,9 @@ from arkouda.dtypes import structDtypeCodes, NUMBER_FORMAT_STRINGS, float64, int
 from arkouda.dtypes import dtype as akdtype
 from arkouda.pdarrayclass import pdarray, create_pdarray, check_arr, uncache_array, create_pdarray_with_name, parse_single_value
 from arkouda.strings import Strings
+from arkouda.pdarraycreation import from_series
 
-__all__ = ["count_frequencies", "move_records", "cumsum", "remove_duplicates"
+__all__ = ["count_frequencies", "move_records", "cumsum", "remove_duplicates", "make_from_csv"
            ]
 
 def count_frequencies(a: pdarray, b: pdarray, n: int, l: list) -> int:
@@ -41,3 +42,17 @@ def remove_duplicates(a: pdarray):
     arr.shape = [size]
     print("size=",size)
     return arr
+
+def make_from_csv(fileName: str, list_of_converters):
+    parse_dates_lst = ['tpep_pickup_datetime','tpep_dropoff_datetime']
+    df = pd.read_csv(fileName,
+                  converters=list_of_converters, header=0, low_memory=False,
+                  parse_dates=parse_dates_lst, infer_datetime_format=True)
+    akdict = {}
+    for cname in df.keys():
+        if df[cname].dtype.name == 'object':
+            akdict[cname] = from_series(df[cname],dtype=np.str)
+        else:
+            akdict[cname] = from_series(df[cname])
+
+    return akdict

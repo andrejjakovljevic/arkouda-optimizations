@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+from time import process_time
 from typing import cast, List, Sequence
 from typeguard import typechecked
 import json, struct
@@ -256,7 +257,7 @@ class pdarray:
         # pdarray binop scalar
         dt = resolve_scalar_dtype(other)
         myType = self.dtype
-        if (self.dtype==akfloat64 or type(other)==np.float64):
+        if (self.dtype==akfloat64 or type(other)==np.float64 or op=='/'):
             myType=akfloat64
         if dt not in DTypes:
             raise TypeError("Unhandled scalar type: {} ({})".format(other,
@@ -410,8 +411,15 @@ class pdarray:
 
     # overload / for pdarray, other can be {pdarray, int, float}
     def __truediv__(self, other):
-        if check_arr(self.dtype, self.size):
-            return binOpWithStore(self, other, uncache_array(self.dtype, self.size), "/")
+        if (isinstance(other,pdarray)):
+            name = other.name
+        else:
+            dt = resolve_scalar_dtype(other)
+            name = NUMBER_FORMAT_STRINGS[dt].format(other)
+        if (("/:"+self.name+":"+name) in args_to_id.keys() and args_to_id[("/:"+self.name+":"+name)]() is not None):
+            return args_to_id[("/:"+self.name+":"+name)]()
+        if check_arr(akfloat64, self.size):
+            return binOpWithStore(self, other, uncache_array(akfloat64, self.size), "/")
         return self._binop(other, "/")
 
     def __rtruediv__(self, other):
@@ -2145,8 +2153,6 @@ class RegistrationError(Exception):
 
 def check_arr(dtype, arr_size):
     # Make sure cache[dtype][arr_size] is not empty
-    #if (dtype in cache):
-    #    print(cache[dtype])
     return dtype in cache and arr_size in cache[dtype] and cache[dtype][arr_size]
 
 

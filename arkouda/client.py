@@ -758,7 +758,6 @@ class BufferItem:
         for info in self.my_pd_array:
             if (names_to_number_of_live_references[info[0]]==0):
                 if (self.cmd=="binopvv" or self.cmd=="binopvs" or self.cmd=="binopsv" or self.cmd=="arange" or self.cmd == "randint"):
-                    #print("Here!")
                     if (info[1]==names_to_weakref[self.pdarray_id]().dtype and int(info[2])==names_to_weakref[self.pdarray_id]().size):
                         self.cmd+='Store'
                         self.args+=" "+info[0]
