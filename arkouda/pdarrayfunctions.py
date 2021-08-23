@@ -4,7 +4,7 @@ import struct
 from typing import cast, Iterable, Optional, Union
 from typeguard import typechecked
 from arkouda.client import generic_msg, id_to_args, args_to_id
-from arkouda.dtypes import structDtypeCodes, NUMBER_FORMAT_STRINGS, float64, int64, \
+from arkouda.dtypes import structDtypeCodes, NUMBER_FORMAT_STRINGS, float64 as akint64, int64 as akfloat64, bool as akbool, \
     DTypes, isSupportedInt, isSupportedNumber, NumericDTypes, SeriesDTypes, \
     int_scalars, numeric_scalars
 from arkouda.dtypes import dtype as akdtype
@@ -40,19 +40,44 @@ def remove_duplicates(a: pdarray):
     size = int(fields[3])
     arr.size = size 
     arr.shape = [size]
-    print("size=",size)
     return arr
 
-def make_from_csv(fileName: str, list_of_converters):
-    parse_dates_lst = ['tpep_pickup_datetime','tpep_dropoff_datetime']
-    df = pd.read_csv(fileName,
-                  converters=list_of_converters, header=0, low_memory=False,
-                  parse_dates=parse_dates_lst, infer_datetime_format=True)
-    akdict = {}
-    for cname in df.keys():
-        if df[cname].dtype.name == 'object':
-            akdict[cname] = from_series(df[cname],dtype=np.str)
+def make_from_csv(fileName: str, listOfTypes, ns: list):
+    file = open(fileName)
+    s = file.read()
+    file.close()
+    pdarrays = []
+    for i in range(len(ns)):
+        cmd = "get_from_csv"
+        cmd_args = "{}\n{}\n{}".format(s, listOfTypes, ns[i])
+        test = cmd_args.split("\n")[-1]
+        print('test=',test)     
+        myType = akint64
+        if (listOfTypes[ns[i]]=='float64'):
+            myType = akfloat64
+        elif listOfTypes[ns[i]]=='date':
+            myType = akint64
         else:
-            akdict[cname] = from_series(df[cname])
+            myType = akbool
+        arr = pdarray(cmd, cmd_args, myType, 0, 1, [0], myType.itemsize)
+        repMsg = generic_msg(cmd, cmd_args, create_pdarray=True, return_value_needed=True, arr_id = arr.name, my_pdarray=[arr])
+        fields = repMsg.split()
+        name = fields[1]
+        mydtype = fields[2]
+        size = int(fields[3])
+        arr.size = size
+        arr.shape = [size]
+        pdarrays.append(arr)
+    return pdarrays
 
-    return akdict
+def transpose(listOfPdarrays):
+    n = len(listOfPdarrays)
+    args = str(n)
+    for pdarray in listOfPdarrays:
+        args +=" "+pdarray.name
+    ret = []
+    cmd = "transpose"
+    for i in range(n):
+        arr = pdarray(cmd, args, listOfPdarrays[0].dtype, listOfPdarrays[0].size, listOfPdarrays[0].ndim, listOfPdarrays[0].shape, listOfPdarrays[0].itemsize)
+        ret.append(arr)
+    repMsg = generic_msg(cmd, args, create_pdarray=True, arr_id=ret, my_pdarray=listOfPdarrays.extend(ret))

@@ -142,7 +142,7 @@ export $(2)
 HELP_TARGETS += $(1)
 .PHONY: $(1)
 $(1):
-	@echo "$$$$$(2)"
+	@echo "$$$$$(2)"CHPL_FLAGS
 endef
 
 ####################

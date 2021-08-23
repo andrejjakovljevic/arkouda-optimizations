@@ -3,7 +3,7 @@ module MsgProcessing
 {
     use ServerConfig;
 
-    use Time only;
+    use Time;
     use Math only;
     use Reflection;
     use Errors;
@@ -36,6 +36,7 @@ module MsgProcessing
     public use CastMsg;
     public use BroadcastMsg;
     public use FlattenMsg;
+    use DateTime;
     use BlockDist;
     use BitOps;
     use AryUtil;
@@ -46,6 +47,7 @@ module MsgProcessing
     use Logging;
     use Unique;
     use ServerConfig;
+    use arkouda_server;
     config const RSLSD_vv = false;
     const vv = RSLSD_vv; // these need to be const for comms/performance reasons
 
@@ -633,7 +635,7 @@ module MsgProcessing
                                     //writeln(listOfArgs[0]);
                                     //writeln(listOfArgs[1]);
                                     //writeln(listOfArgs[2]);
-                                    var bucket = C.f1(a.a[i], listOfArgs[0], listOfArgs[1], listOfArgs[2]); // calc bucket from key
+                                    var bucket = f1(a.a[i], listOfArgs[0], listOfArgs[1], listOfArgs[2]); // calc bucket from key
                                     //writeln(bucket);
                                     taskBucketCounts[bucket] += listOfArgs[3];
                                     //assert(lock.isFull, "Is not full!");
@@ -734,17 +736,6 @@ module MsgProcessing
 
     **/
 
-    module C
-    {
-        extern 
-        {
-            static long f1(long a, long arg1, long arg2, long arg3)
-            {
-                return (((a - arg1) / arg2) % arg3);
-            }
-        }
-    }
-
     proc moveRecordsMsg(cmd: string, payload: string, st: borrowed SymTab): MsgTuple throws
     {
         param pn = Reflection.getRoutineName();
@@ -776,7 +767,7 @@ module MsgProcessing
         a.a.reverse();
         var lock: sync bool;
         for k in a.a {
-            var ret: int = C.f1(k, listOfArgs[0], listOfArgs[1], listOfArgs[2]);
+            var ret: int = f1(k, listOfArgs[0], listOfArgs[1], listOfArgs[2]);
             // lock.writeEF(true);
             b.a[ret] = f2(b.a[ret], listOfArgs[3]);
             c.a[b.a[ret]] = k;
@@ -813,4 +804,99 @@ module MsgProcessing
         omLogger.debug(getModuleName(),getRoutineName(),getLineNumber(),repMsg);
         return new MsgTuple(repMsg, MsgType.NORMAL);
     }
+
+    proc getFromCsvMsg(cmd: string, payload: string, st: borrowed SymTab): MsgTuple throws {
+        param pn = Reflection.getRoutineName();
+        var splitted = payload.split('\n');
+        var n : int = try! splitted[splitted.size-1] : int;
+        var typesList = splitted[splitted.size-2];
+        var typesListList = typesList.strip("[]").split(',').strip(' ').strip('\'');
+        var rname = st.nextName();
+        if (typesListList[n]=="int64") then {
+            var e = st.addEntry(rname, splitted.size - 4, int); 
+            forall i in 1..splitted.size - 4 do {
+                var elems = splitted[i].split(",");
+                if (elems[n]!="") then e.a[i-1] = elems[n] : int;
+            }
+        }
+        else if (typesListList[n]=="float64") then {
+            var e = st.addEntry(rname, splitted.size - 4, real);
+            forall i in 1..splitted.size - 4 do {
+                var elems = splitted[i].split(",");
+                if (elems[n]!="") then e.a[i-1] = elems[n] : real;
+            }
+        }
+        else if (typesListList[n]=="bool") then {
+            var e = st.addEntry(rname, splitted.size - 4, bool);
+            forall i in 1..splitted.size - 4 do {
+                var elems = splitted[i].split(",");
+                if (elems[n]!="") then e.a[i-1] = elems[n] : bool;
+            }
+        }   
+        else if (typesListList[n]=="date") then {
+            var e = st.addEntry(rname, splitted.size - 4, int);
+            forall i in 1..splitted.size - 4 do {
+                var elems = splitted[i].split(",");
+                var date = elems[n];
+                var first = date.split(" ");
+                var second = first[0].split("-");
+                //writeln(second);
+                var year=1970;
+                var month=1;
+                var day = 1;
+                if (second[0]!="") then year = try! second[0] : int;
+                if (second[1]!="") then month = try! second[1] : int;
+                if (second[2]!="") then day = try! second[2] : int;
+                var third = first[1].split(":");
+                //writeln(third);
+                //writeln("i=");
+                //writeln(i);
+                var hours = 0;
+                var minutes = 0;
+                var seconds = 0;
+                if (third[0]!="") then hours = try! third[0] : int;
+                if (third[1]!="") then minutes = try! third[1] : int;
+                if (third[2]!="") then seconds = try! third[2] : int;
+                var realDate: datetime; 
+                realDate.init(year, month, day, hours, minutes, seconds);
+                var basic_date : datetime;
+                basic_date.init(1970,1,1);
+                var diff : int = (realDate - basic_date).total_seconds() : int;
+                e.a[i-1] = diff;
+                //e.a[i-2] = 0;
+            }
+        }
+        var repMsg: string = "created %s".format(st.attrib(rname));
+        return new MsgTuple(repMsg, MsgType.NORMAL);
+    }
+
+    proc transposeMsg(cmd, args, st): MsgTuple throws{
+        param pn = Reflection.getRoutineName();
+        var list_first = args.split(" ");
+        var n : int = list_first[0] : int;
+        var input_list_names : [0..n-1] string;
+        var res_list_names : [0..n-1] string;
+        forall i in 0..n-1 do {
+            input_list_names[i] = list_first[i+1];
+        }
+        forall i in 0..n-1 do {
+            res_list_names[i] = st.nextName();
+            st.addEntry(res_list_names[i], n, int);
+        }
+        forall i in 0..n-1 do {
+            var l =  st.lookup(res_list_names[i]);
+            var l1 = toSymEntry(l,int);
+            forall j in 0..n-1 do { 
+                var r = st.lookup(input_list_names[j]);
+                var r1 = toSymEntry(r, int);
+                l1.a[j]=r1.a[i];
+            }
+        }
+        var repMsg: string = "created";
+        for i in 0..n-1 do {
+            repMsg+=" "+res_list_names[i];
+        }
+        return new MsgTuple(repMsg, MsgType.NORMAL);
+    }
+
 }
