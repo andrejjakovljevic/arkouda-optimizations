@@ -595,32 +595,40 @@ def generic_msg(cmd: str, args: Union[str, bytes] = None, send_bytes: bool = Fal
     if buff_emptying or return_value_needed:
         try:
             # Transform the args with client to server names
+            #print(client_to_server_names)
             if not send_bytes:
                 args = transform_args(args)
             #print("cmd=", cmd)
             #print("args=",args)
+            #print(create_pdarray)
             # Send the message
             if send_bytes:
                 repMsg = _send_binary_message(cmd=cmd,
                                               payload=cast(bytes, args),
                                               recv_bytes=recv_bytes)
-                return repMsg
+                #return repMsg
             else:
                 repMsg = _send_string_message(cmd=cmd,
                                               args=cast(str, args),
                                               recv_bytes=recv_bytes)
 
             if create_pdarray:
-                fields = repMsg.split()
-                name = fields[1]
-                mydtype = fields[2]
-                size = int(fields[3])
-                ndim = int(fields[4])
-                shape = [int(el) for el in fields[5][1:-1].split(',')]
-                itemsize = int(fields[6])
-                logger.debug(("created Chapel array with name: {} dtype: {} size: {} ndim: {} shape: {} " +
-                              "itemsize: {}").format(name, mydtype, size, ndim, shape, itemsize))
-                client_to_server_names[arr_id] = name
+                if (cmd!="transpose"):
+                    fields = repMsg.split()
+                    name = fields[1]
+                    mydtype = fields[2]
+                    size = int(fields[3])
+                    ndim = int(fields[4])
+                    shape = [int(el) for el in fields[5][1:-1].split(',')]
+                    itemsize = int(fields[6])
+                    #print("Here!")
+                    logger.debug(("created Chapel array with name: {} dtype: {} size: {} ndim: {} shape: {} " +
+                                "itemsize: {}").format(name, mydtype, size, ndim, shape, itemsize))
+                    client_to_server_names[arr_id] = name
+                else:
+                    fields = repMsg.split()
+                    for i in range(1, len(arr_id)+1):
+                        client_to_server_names[arr_id[i-1]]=fields[i]
             # print("repmsg=",repMsg)
             return repMsg
 
@@ -805,7 +813,11 @@ def make_dependencies(item: BufferItem):
         for arg in q_elem.args.split(" "):
             args_list_q_elem.append(arg)
         if (q_elem.pdarray_id!=None):
-            args_list_q_elem.append(q_elem.pdarray_id)
+            if (isinstance(q_elem.pdarray_id,list)):
+                args_list_q_elem.extend(q_elem.pdarray_id)
+                #print(args_list_q_elem)
+            else:
+                args_list_q_elem.append(q_elem.pdarray_id)
         # args_list_q_elem=list(filter(is_temporary, args_list_q_elem))
         for arg_q_elem in args_list_q_elem:
             if arg_q_elem in args_list and not(q_elem in item.dependencies):
@@ -913,12 +925,12 @@ def delete_from_args_map(arrName: str):
 def cache_array(arrName: str, arrType, arrSize):
     if (sys.meta_path is None):
         return
-    # print("name=",arr.name)
+    #print("name=", arrName)
     if arrName not in client_to_server_names.keys():
-        return;
+        return
     #print("----MAP----")
     #for (key, value) in client_to_server_names.items():
     #    print("key=", key, "value=", value)
-    # print("Caching ", client_to_server_names[arr.name], arr.size    )
+    #print("Caching ", client_to_server_names[arrName], arrSize, arrType)
     cache[arrType][arrSize].add(client_to_server_names[arrName])
     client_to_server_names.pop(arrName)

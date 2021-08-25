@@ -48,6 +48,7 @@ module MsgProcessing
     use Unique;
     use ServerConfig;
     use arkouda_server;
+    use LinearAlgebra;
     config const RSLSD_vv = false;
     const vv = RSLSD_vv; // these need to be const for comms/performance reasons
 
@@ -897,6 +898,24 @@ module MsgProcessing
             repMsg+=" "+res_list_names[i];
         }
         return new MsgTuple(repMsg, MsgType.NORMAL);
+    }
+
+    proc triangleCountMsg(cmd, args, st): MsgTuple throws {
+        param pn = Reflection.getRoutineName();
+        var list_first = args.split(" ");
+        var n : int = list_first[0] : int;
+        var mat : [0..#n, 0..#n] int;
+        forall i in 0..n-1 do {
+            var l = st.lookup(list_first[i+1]);
+            var l1 = toSymEntry(l, int);
+            forall j in 0..n-1 do {
+                mat[i,j] = l1.a[j];
+            }
+        }
+        var new_mat = dot(mat, mat)*mat;
+        var s: int = + reduce new_mat;
+        var repMsg: string = "int64 %i".format(s);
+        return new MsgTuple(repMsg, MsgType.NORMAL); 
     }
 
 }

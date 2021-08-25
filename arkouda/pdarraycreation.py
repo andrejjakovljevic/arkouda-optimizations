@@ -3,7 +3,7 @@ import pandas as pd  # type: ignore
 import struct
 from typing import cast, Iterable, Optional, Union
 from typeguard import typechecked
-from arkouda.client import generic_msg, id_to_args, args_to_id
+from arkouda.client import generic_msg, client_to_server_names, id_to_args, args_to_id, find_last, delete_from_args_map, cache_array, cache, names_to_weakref
 from arkouda.dtypes import structDtypeCodes, NUMBER_FORMAT_STRINGS, float64, int64, \
     DTypes, isSupportedInt, isSupportedNumber, NumericDTypes, SeriesDTypes, \
     int_scalars, numeric_scalars
@@ -208,23 +208,46 @@ def array(a: Union[pdarray, np.ndarray, Iterable]) -> Union[pdarray, Strings]:
                             "ak.maxTransferBytes to allow"))
     # Pack binary array data into a bytes object with a command header
     # including the dtype and size
-    fmt = ">{:n}{}".format(size, structDtypeCodes[a.dtype.name])
-    req_msg = "{} {:n} ". \
-                  format(a.dtype.name, size).encode() + struct.pack(fmt, *a)
-    arr = pdarray('array', req_msg)
-    repMsg = generic_msg(cmd='array', args=req_msg, send_bytes=True, create_pdarray=True, return_value_needed=True, arr_id=arr.name, my_pdarray=[arr])
-    fields = repMsg.split()
-    mydtype = fields[2]
-    size = int(fields[3])
-    ndim = int(fields[4])
-    shape = [int(el) for el in fields[5][1:-1].split(',')]
-    itemsize = int(fields[6])
-    arr.dtype = mydtype
-    arr.size = size
-    arr.ndim = ndim
-    arr.shape = [size]
-    arr.itemsize = itemsize
-    return arr
+    if (check_arr(a.dtype, a.size)):
+        fmt = ">{:n}{}".format(size, structDtypeCodes[a.dtype.name])
+        cmd = 'arrayStore'
+        name = uncache_array(a.dtype, a.size)
+        req_msg = "{} {} {:n} ". \
+                        format(a.dtype.name, name, size).encode() + struct.pack(fmt, *a)
+        #print(req_msg)
+        arr = pdarray(cmd,req_msg)
+        repMsg = generic_msg(cmd = cmd, args=req_msg, send_bytes=True, return_value_needed=True, arr_id=arr.name, my_pdarray=[arr])
+        fields = repMsg.split()
+        mydtype = akdtype(fields[2])
+        size = int(fields[3])
+        ndim = int(fields[4])
+        shape = [int(el) for el in fields[5][1:-1].split(',')]
+        itemsize = int(fields[6])
+        arr.dtype = mydtype
+        arr.size = size
+        arr.ndim = ndim
+        arr.shape = [size]
+        arr.itemsize = itemsize
+        client_to_server_names[arr.name]=name
+        return arr
+    else:
+        fmt = ">{:n}{}".format(size, structDtypeCodes[a.dtype.name])
+        req_msg = "{} {:n} ". \
+                    format(a.dtype.name, size).encode() + struct.pack(fmt, *a)
+        arr = pdarray('array', req_msg)
+        repMsg = generic_msg(cmd='array', args=req_msg, send_bytes=True, create_pdarray=True, return_value_needed=True, arr_id=arr.name, my_pdarray=[arr])
+        fields = repMsg.split()
+        mydtype = akdtype(fields[2])
+        size = int(fields[3])
+        ndim = int(fields[4])
+        shape = [int(el) for el in fields[5][1:-1].split(',')]
+        itemsize = int(fields[6])
+        arr.dtype = mydtype
+        arr.size = size
+        arr.ndim = ndim
+        arr.shape = [size]
+        arr.itemsize = itemsize
+        return arr
 
 
 def zeros(size: int_scalars, dtype: type = np.float64) -> pdarray:

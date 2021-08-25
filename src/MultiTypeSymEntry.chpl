@@ -110,13 +110,11 @@ module MultiTypeSymEntry
         :type etype: type
         */
         proc init(len: int, type etype) {
-            watch.start();
             live = live + 1;
             if (live>maxi) then maxi=live;
             super.init(etype, len);
             this.etype = etype;
             this.aD = makeDistDom(len);
-            watch.stop();
             // this.a uses default initialization
         }
 

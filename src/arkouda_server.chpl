@@ -386,6 +386,7 @@ proc main() {
                 when "remove_duplicates" {repTuple = removeDuplicatesMsg(cmd, args, st);}
                 when "get_from_csv"      {repTuple = getFromCsvMsg(cmd, args, st);}
                 when "transpose"         {repTuple = transposeMsg(cmd, args, st);}
+                when "triangle_count"    {repTuple = triangleCountMsg(cmd, args, st);}
                 when "connect" {
                     if authenticate {
                         repTuple = new MsgTuple("connected to arkouda server tcp://*:%i as user %s with token %s".format(

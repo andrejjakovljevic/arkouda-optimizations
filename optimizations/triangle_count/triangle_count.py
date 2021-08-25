@@ -100,7 +100,7 @@ def create_blocks_scalar(A: np.ndarray, row_size, col_size):
 
 x = np.random.randint(2, size=(4, 4))
 
-ak.connect(connect_url='tcp://nlogin1:5555')
+ak.connect(connect_url='tcp://nlogin3:5555')
 start = time.perf_counter()
 # print('nesto')
 print(triangle_count_scalar(x, 2, 2, 2))

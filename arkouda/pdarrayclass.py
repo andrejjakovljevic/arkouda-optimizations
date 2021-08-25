@@ -154,7 +154,6 @@ class pdarray:
                     id_to_args[self.name].append(op + ":" + thing2 + ":" + thing1)
 
     def __del__(self):
-        # print('called del', self.name)
         ret = find_last(self)
         if (not ret):
             delete_from_args_map(self.name)
@@ -2153,6 +2152,7 @@ class RegistrationError(Exception):
 
 def check_arr(dtype, arr_size):
     # Make sure cache[dtype][arr_size] is not empty
+    #print("checking", dtype, arr_size)
     return dtype in cache and arr_size in cache[dtype] and cache[dtype][arr_size]
 
 
