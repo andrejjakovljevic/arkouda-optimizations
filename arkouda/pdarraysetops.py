@@ -12,7 +12,7 @@ from arkouda.dtypes import dtype
 Categorical = ForwardRef('Categorical')
 
 __all__ = ["unique", "in1d", "concatenate", "union1d", "intersect1d",
-           "setdiff1d", "setxor1d"]
+           "setdiff1d", "setxor1d", "sortIntersect1d"]
 
 logger = getArkoudaLogger(name='pdarraysetops')
 
@@ -403,6 +403,31 @@ def intersect1d(pda1 : pdarray, pda2 : pdarray,
     mask = aux[1:] == aux[:-1]
     int1d = aux[:-1][mask]
     return int1d
+
+# intersect two sorted arrays 
+def sortIntersect1d(pda1: pdarray, pda2: pdarray) -> pdarray:
+    if pda1.size == 0:
+        return pda1 # nothing in the intersection
+    if pda2.size == 0:
+        return pda2 # nothing in the intersection
+    if pda1.dtype == int and pda2.dtype == int:
+        cmd = "sortedintersect1d"
+        args = "{} {}".format(pda1.name, pda2.name)
+        arr = pdarray(cmd, args)
+        repMsg = generic_msg(cmd=cmd, args=args, return_value_needed=True, create_pdarray=True, arr_id=arr.name, my_pdarray=[pda1,pda2,arr])
+        fields = repMsg.split()
+        mydtype = dtype(fields[2])
+        size = int(fields[3])
+        ndim = int(fields[4])
+        shape = [int(el) for el in fields[5][1:-1].split(',')]
+        itemsize = int(fields[6])
+        arr.dtype = mydtype
+        arr.size = size
+        arr.ndim = ndim
+        arr.shape = shape
+        arr.itemsize = itemsize
+        return arr
+    return None
 
 # (A1 - A2) Set Difference: elements have to be in first array but not second
 @typechecked

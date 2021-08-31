@@ -78,6 +78,42 @@ module ArraySetopsMsg
         }
     }
 
+    proc sortedIntersect1dMsg(cmd: string, payload: string, st: borrowed SymTab): MsgTuple throws {
+        param pn = Reflection.getRoutineName();
+        var repMsg: string; // response message
+        // split request into fields
+        var (name, name2) = payload.splitMsgToTuple(2);
+        
+        var vname = st.nextName();
+
+        var gEnt: borrowed GenSymEntry = st.lookup(name);
+        var gEnt2: borrowed GenSymEntry = st.lookup(name2);
+
+        select(gEnt.dtype) {
+          when (DType.Int64) {
+             if (gEnt.dtype != gEnt2.dtype) {
+                 var errorMsg = notImplementedError("newIntersect1d",gEnt2.dtype);
+                 asLogger.error(getModuleName(),getRoutineName(),getLineNumber(),errorMsg);                             
+                 return new MsgTuple(errorMsg, MsgType.ERROR);
+             }
+             var e = toSymEntry(gEnt,int);
+             var f = toSymEntry(gEnt2, int);
+             
+             var aV = sortedIntersect1dHelper(e.a, f.a);
+             st.addEntry(vname, new shared SymEntry(aV));
+
+             repMsg = "created " + st.attrib(vname);
+             asLogger.debug(getModuleName(),getRoutineName(),getLineNumber(),repMsg);
+             return new MsgTuple(repMsg, MsgType.NORMAL);
+           }
+           otherwise {
+               var errorMsg = notImplementedError("newIntersect1d",gEnt.dtype);
+               asLogger.error(getModuleName(),getRoutineName(),getLineNumber(),errorMsg);           
+               return new MsgTuple(errorMsg, MsgType.ERROR);
+           }
+        }
+    }
+
     /*
     Parse, execute, and respond to a setxor1d message
     :arg reqMsg: request containing (cmd,name,name2,assume_unique)

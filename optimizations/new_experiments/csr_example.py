@@ -1,5 +1,5 @@
 import arkouda as ak
-from scipy.sparse import csr_matrix
+from scipy.sparse import csr_matrix, csc_matrix
 import numpy as np
 import time
 
@@ -20,22 +20,21 @@ def get_matrices(filename):
         if (x=="\n"):
             continue
         spl = x.split(' ')
-        f = int(spl[0])
-        s = int(spl[1])
+        f = int(spl[0])-1
+        s = int(spl[1])-1
         data = float(spl[2])
         if (s>f):
             (f, s) = (s, f)
         fs.append(f)
         ss.append(s)
         datas.append(data)
-    s_mat = csr_matrix((datas,(fs, ss)), shape=(4096, 4096))
-    s_mat_t = s_mat.transpose(axes = None, copy=True)
+    s_mat = csr_matrix((datas,(fs, ss)), shape=(1138, 1138))
+    s_mat_t = csc_matrix(s_mat)
     return (s_mat,s_mat_t)
 
 
-ak.connect(connect_url='tcp://nlogin3:5555')
+ak.connect(connect_url='tcp://nlogin2:5555')
 (s_mat, s_mat_t) = get_matrices("/home/an58/1138_bus.mtx")
-#print(s_mat.todense())
 dat_real = s_mat.data.astype(np.int64)
 indexes = s_mat.indices.astype(np.int64)
 pointers = s_mat.indptr.astype(np.int64)
@@ -49,16 +48,23 @@ pd_indexes = ak.array(indexes)
 pd_indexes2 = ak.array(indexes2)
 k = 0
 s = 0
-start = time.perf_counter()
-for i in range(len(indexes)):
-    while (k<len(pointers)-1 and i>=pointers[k+1]):
-        k+=1
-    s += ak.intersect1d(find_splice(k,pointers,pd_indexes),find_splice(indexes[i],pointers2,pd_indexes2), assume_unique=True).size
 
-print(s)
-end = time.perf_counter()
-print(f"first took {end - start:0.9f} seconds")
+#start = time.perf_counter()
+#for i in range(len(pointers)-1):
+#    right = pointers[i+1]
+#    if (pointers[i]<right):
+#        for j in range(pointers[i],right):
+            #print(i," and ", pd_indexes[j])
+#            s+= ak.intersect1d(find_splice(i, pointers, pd_indexes), find_splice(pd_indexes[j], pointers2, pd_indexes2), True).size
+
+#print(s)
+#end = time.perf_counter()
+#print(f"first took {end - start:0.9f} seconds")
 start = time.perf_counter()
+#print(pd_pointers)
+#print(pd_indexes)
+#print(pd_pointers2)
+#print(pd_indexes2)
 s = ak.triangle_count_sparse(4, pd_pointers, pd_indexes, pd_pointers2, pd_indexes2)
 print(s)
 end = time.perf_counter()

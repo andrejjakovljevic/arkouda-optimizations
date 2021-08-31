@@ -306,6 +306,7 @@ proc main() {
                 when "mink"              {repTuple = minkMsg(cmd, args, st);}
                 when "maxk"              {repTuple = maxkMsg(cmd, args, st);}
                 when "intersect1d"       {repTuple = intersect1dMsg(cmd, args, st);}
+                when "sortedintersect1d" {repTuple = sortedIntersect1dMsg(cmd,args,st);}
                 when "setdiff1d"         {repTuple = setdiff1dMsg(cmd, args, st);}
                 when "setxor1d"          {repTuple = setxor1dMsg(cmd, args, st);}
                 when "union1d"           {repTuple = union1dMsg(cmd, args, st);}

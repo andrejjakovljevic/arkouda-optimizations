@@ -50,7 +50,9 @@ module MsgProcessing
     use Unique;
     use ServerConfig;
     use arkouda_server;
+    use ArraySetops;
     use LinearAlgebra;
+    
     config const RSLSD_vv = false;
     const vv = RSLSD_vv; // these need to be const for comms/performance reasons
 
@@ -922,17 +924,14 @@ module MsgProcessing
         var indexesReal2 = toSymEntry(indexes2, int);
         var k: int = 0;
         var s: int = 0;
-        var helperArray: [0..indexesReal.a.size-1] int;
-        for i in 0..indexesReal.a.size-1 do {
-            while (k<p.a.size-1 && i>=p.a[k+1]) do {
-                k = k+1;
-            }
-            helperArray[i]=k;
-        }
         var help2: [0..indexesReal.a.size-1] int;
-        for i in 0..indexesReal.a.size-1 do {
-            var help = intersect1d(splice(helperArray[i], p.a, indexesReal.a),splice(indexesReal.a[i],p2.a, indexesReal2.a),true);
-            help2[i] = help.size;
+        forall i in 0..p.a.size-2 do {
+            if (p.a[i]<p.a[i+1])
+            {
+                forall j in p.a[i]..p.a[i+1] do {
+                    help2[j] = mergeArraysCount(splice(i, p.a, indexesReal.a),splice(indexesReal.a[j],p2.a, indexesReal2.a));
+                }
+            }
         }
         s = + reduce help2;
         var repMsg: string = "int64 %i".format(s);

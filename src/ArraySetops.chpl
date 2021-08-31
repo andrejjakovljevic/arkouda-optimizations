@@ -37,6 +37,57 @@ module ArraySetops
       return intersect1dHelper(a,b);
     }
 
+    /*
+      Merges sorted arrays
+    */
+    proc mergeArrays(a: [] ?t, b: [] t) {
+      var d: [0..a.size+b.size-1] t;
+      var k1: int = 0;
+      var k2: int = 0;
+      var k: int = 0;
+      while (k1<a.size && k2<b.size) do {
+        if (a[k1]<b[k2]) then {
+          k1+=1;
+        }
+        else if (a[k1]>b[k2]) {
+          k2+=1;
+        }
+        else {
+          d[k] = a[k1];
+          k1+=1;
+          k2+=1;
+          k+=1;
+        }
+      }
+      return (d,k);
+    }
+
+    proc mergeArraysCount(a: [] ?t, b: [] t) {
+      var k1: int = 0;
+      var k2: int = 0;
+      var k: int = 0;
+      while (k1<a.size && k2<b.size) do {
+        if (a[k1]<b[k2]) then {
+          k1+=1;
+        }
+        else if (a[k1]>b[k2]) {
+          k2+=1;
+        }
+        else {
+          k1+=1;
+          k2+=1;
+          k+=1;
+        }
+      }
+      return k;
+    }
+
+    proc sortedIntersect1dHelper(a: [] ?t, b: [] t) {
+      var (aux,k) = mergeArrays(a,b);
+
+      return aux[0..k-1];
+    }
+
     proc intersect1dHelper(a: [] ?t, b: [] t) {
       var aux = radixSortLSD_keys(concatset(a,b));
 
