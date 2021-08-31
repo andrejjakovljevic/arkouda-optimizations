@@ -101,6 +101,12 @@ class pdarray:
         A list or tuple containing the sizes of each dimension of the array
     itemsize : int_scalars
         The size in bytes of each element
+    cmd : string
+        Command which created the pdarray
+    cmd_args : string
+        Arguments of the command which created the pdarray
+    properties: dict
+        Calculated properties of the pdarray (min, max...)
     """
 
     BinOps = frozenset(["+", "-", "*", "/", "//", "%", "<", ">", "<=", ">=",

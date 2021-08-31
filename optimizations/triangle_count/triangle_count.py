@@ -102,7 +102,6 @@ x = np.random.randint(2, size=(4, 4))
 
 ak.connect(connect_url='tcp://nlogin3:5555')
 start = time.perf_counter()
-# print('nesto')
 print(triangle_count_scalar(x, 2, 2, 2))
 # print(triangle_count_numpy(x, 2, 2, 2, False))
 end = time.perf_counter()

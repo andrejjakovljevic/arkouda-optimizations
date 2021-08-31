@@ -101,6 +101,71 @@ module GenSymIO {
     }
 
     /*
+     * Puts a arrays into an already existing one
+     */
+    proc arrayStoreMsg(cmd: string, payload: bytes, st: borrowed SymTab): MsgTuple throws {
+        var msgType = MsgType.NORMAL;
+        var msg:string = "";
+        var oldName:string = "";
+        var (dtypeBytes, oldNameBytes, sizeBytes, data) = payload.splitMsgToTuple(b" ", 4);
+        var dtype = DType.UNDEF;
+        var size:int;
+        try {
+            dtype = str2dtype(dtypeBytes.decode());
+            oldName = oldNameBytes.decode();
+            size = sizeBytes:int;
+        } catch {
+            var errorMsg = "Error parsing/decoding either dtypeBytes or size";
+            gsLogger.error(getModuleName(), getRoutineName(), getLineNumber(), errorMsg);
+            return new MsgTuple(errorMsg, MsgType.ERROR);
+        }
+        var tmpf:file; defer { ensureClose(tmpf); }
+        try {
+            tmpf = openmem();
+            var tmpw = tmpf.writer(kind=iobig);
+            tmpw.write(data);
+            tmpw.close();
+        } catch {
+            var errorMsg = "Could not write to memory buffer";
+            gsLogger.error(getModuleName(),getRoutineName(),getLineNumber(),errorMsg);
+            return new MsgTuple(errorMsg, MsgType.ERROR);
+        }
+        var right: borrowed GenSymEntry = st.lookup(oldName);
+        if dtype == DType.Int64 {
+            var r = toSymEntry(right,int);
+            var localA: [r.aD.low..r.aD.high] int;
+            var tmpr = tmpf.reader(kind=iobig, start=0);
+            tmpr.read(localA);
+            r.a = localA;
+            tmpr.close(); 
+        } else if dtype == DType.Float64 {
+            var r = toSymEntry(right,real);
+            var localA: [r.aD.low..r.aD.high] real;
+            var tmpr = tmpf.reader(kind=iobig, start=0);
+            tmpr.read(localA);
+            r.a = localA;
+            tmpr.close(); 
+        } else if dtype == DType.Bool {
+            var r = toSymEntry(right,bool);
+            var localA: [r.aD.low..r.aD.high] bool;
+            var tmpr = tmpf.reader(kind=iobig, start=0);
+            tmpr.read(localA);
+            r.a = localA;
+            tmpr.close(); 
+        } else if dtype == DType.UInt8 {
+            var r = toSymEntry(right,uint(8));
+            var localA: [r.aD.low..r.aD.high] uint(8);
+            var tmpr = tmpf.reader(kind=iobig, start=0);
+            tmpr.read(localA);
+            r.a = localA;
+            tmpr.close(); 
+        }
+        msg = "updated " + st.attrib(oldName);
+        gsLogger.debug(getModuleName(),getRoutineName(),getLineNumber(),msg);
+        return new MsgTuple(msg, msgType);
+    }
+
+    /*
      * Read the data payload from the memory buffer, encapsulate
      * within a SymEntry, and write to the SymTab cache
      * Here tmpf is a memory buffer which contains the data we want to read.

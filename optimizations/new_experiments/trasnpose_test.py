@@ -1,36 +1,37 @@
-from sqlalchemy.sql.functions import concat
-
 import arkouda as ak
 import math
 import numpy as np
+from scipy.sparse import csr_matrix
 import time
 
 def create_blocks_scalar(A: np.ndarray):
-    k1 = np.array([0, 0, 0, 0])
-    k2 = np.array([1, 0, 0, 0])
-    k3 = np.array([1, 1, 0, 0])
-    k4 = np.array([0, 1, 1, 0])
     out = []
-    out.append(ak.array(k1))
-    out.append(ak.array(k2))
-    out.append(ak.array(k3))
-    out.append(ak.array(k4))
+    for k in A:
+        out.append(ak.array(k))
     return out
 
-def transposed(A: np.ndarray):
-    k1 = np.array([0, 1, 1, 0])
-    k2 = np.array([0, 0, 1, 1])
-    k3 = np.array([0, 0, 0, 1])
-    k4 = np.array([0, 0, 0, 0])
-    out = []
-    out.append(ak.array(k1))
-    out.append(ak.array(k2))
-    out.append(ak.array(k3))
-    out.append(ak.array(k4))
-    return out
+def get_matrices(filename):
+    f = open(filename, "r")
+    fs = []
+    ss = []
+    datas = []
+    for x in f:
+        if (x=="\n"):
+            continue
+        spl = x.split(' ')
+        f = int(spl[0])
+        s = int(spl[1])
+        data = float(spl[2])
+        if (s>f):
+            (f, s) = (s, f)
+        fs.append(f)
+        ss.append(s)
+        datas.append(data)
+    s_mat = csr_matrix((datas,(fs, ss)), shape=(4, 4))
+    s_mat_t = s_mat.transpose(axes = None, copy=True)
+    return (s_mat,s_mat_t)
 
-def triangle_count(A: list) -> int:
-    At = transposed(A)
+def triangle_count(A: list, At: list) -> int:
     maxi = 0
     arr = np.zeros(len(A),np.int64)
     for i in range(len(A)):
@@ -45,10 +46,18 @@ def triangle_count_on_chapel(A: list) -> int:
     return ak.triangle_count(A)
 
 x = np.random.randint(2, size=(2, 2))
-ak.connect(connect_url='tcp://nlogin2:5555')
+ak.connect(connect_url='tcp://nlogin3:5555')
 out = create_blocks_scalar(x)
+(s_mat, s_mat_t) = get_matrices("/home/an58/help.mtx")
+dense1 = s_mat.todense().tolist()
+dense2 = s_mat_t.todense().tolist()
+#print(dense2)
+#print(dense1[0])
+#print(dense1)
+pd_out = create_blocks_scalar(np.array(dense1,np.int64))
+pd_out_t = create_blocks_scalar(np.array(dense2, np.int64))
 start = time.perf_counter()
-print(triangle_count(out))
+print(ak.triangle_count(pd_out))
 end = time.perf_counter()
-print(f"union_v1 took {end - start:0.9f} seconds")
+print(f"transpose_v1 took {end - start:0.9f} seconds")
 ak.shutdown()

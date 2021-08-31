@@ -7,6 +7,7 @@ from arkouda.pdarraycreation import zeros, zeros_like, array
 from arkouda.sorting import argsort
 from arkouda.strings import Strings
 from arkouda.logger import getArkoudaLogger
+from arkouda.dtypes import dtype
 
 Categorical = ForwardRef('Categorical')
 
@@ -377,9 +378,22 @@ def intersect1d(pda1 : pdarray, pda2 : pdarray,
     if pda2.size == 0:
         return pda2 # nothing in the intersection
     if pda1.dtype == int and pda2.dtype == int:
-        repMsg = generic_msg(cmd="intersect1d", args="{} {} {}".\
-                             format(pda1.name, pda2.name, assume_unique))
-        return create_pdarray(cast(str,repMsg))
+        cmd = "intersect1d"
+        args = "{} {} {}".format(pda1.name, pda2.name, assume_unique)
+        arr = pdarray(cmd, args)
+        repMsg = generic_msg(cmd=cmd, args=args, return_value_needed=True, create_pdarray=True, arr_id=arr.name, my_pdarray=[pda1,pda2,arr])
+        fields = repMsg.split()
+        mydtype = dtype(fields[2])
+        size = int(fields[3])
+        ndim = int(fields[4])
+        shape = [int(el) for el in fields[5][1:-1].split(',')]
+        itemsize = int(fields[6])
+        arr.dtype = mydtype
+        arr.size = size
+        arr.ndim = ndim
+        arr.shape = shape
+        arr.itemsize = itemsize
+        return arr
     if not assume_unique:
         pda1 = unique(pda1)
         pda2 = unique(pda2)

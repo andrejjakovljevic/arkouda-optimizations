@@ -26,8 +26,6 @@ const asLogger = new Logger(logLevel);
 
 var watch = new Time.Timer();
 watch.clear();
-var watch2 = new Time.Timer();
-watch2.clear();
 var live: int = 0;
 var maxi: int = 0;
 
@@ -270,7 +268,7 @@ proc main() {
               try {
                 if (cmd != "array" && cmd != "get_from_csv") {
                   asLogger.info(getModuleName(), getRoutineName(), getLineNumber(),
-                                                     ">>> %t %t".format(cmd, args));
+                                                     ">>> %t".format(cmd));
                 } else {
                   asLogger.info(getModuleName(), getRoutineName(), getLineNumber(),
                                                      ">>> %s [binary data]".format(cmd));
@@ -285,8 +283,8 @@ proc main() {
                 shutdown(user=user);
                 if (trace) {
                     asLogger.info(getModuleName(),getRoutineName(),getLineNumber(),
-                                         "<<< shutdown initiated by %s took %.17r sec, time spent stuff %.17r ms, max live %i".format(user, 
-                                                   t1.elapsed() - s0, watch2.elapsed(TimeUnits.milliseconds), maxi));
+                                         "<<< shutdown initiated by %s took %.17r sec, time spent creating stuff %.17r ms, max live %i".format(user, 
+                                                   t1.elapsed() - s0, watch.elapsed(TimeUnits.milliseconds), maxi));
                 }
                 break;
             }
@@ -302,6 +300,7 @@ proc main() {
             select cmd
             {
                 when "array"             {repTuple = arrayMsg(cmd, payload, st);}
+                when "arrayStore"        {repTuple = arrayStoreMsg(cmd, payload, st);}
                 when "tondarray"         {binaryRepMsg = tondarrayMsg(cmd, args, st);}
                 when "cast"              {repTuple = castMsg(cmd, args, st);}
                 when "mink"              {repTuple = minkMsg(cmd, args, st);}
@@ -382,11 +381,10 @@ proc main() {
                 when "zerosStore"        {repTuple = zerosStoreMsg(cmd, args, st);}
                 when "count_frequencies" {repTuple = countFrequenciesMsg(cmd, args, st);}
                 when "move_records"      {repTuple = moveRecordsMsg(cmd, args, st);}
-                when "cumsum"            {repTuple = cumSumMsg(cmd, args, st);}
-                when "remove_duplicates" {repTuple = removeDuplicatesMsg(cmd, args, st);}
-                when "get_from_csv"      {repTuple = getFromCsvMsg(cmd, args, st);}
-                when "transpose"         {repTuple = transposeMsg(cmd, args, st);}
+                when "cumsum"            {repTuple = cumSumMsg(cmd,args,st);}
+                when "remove_duplicates" {repTuple = removeDuplicatesMsg(cmd,args,st);}
                 when "triangle_count"    {repTuple = triangleCountMsg(cmd, args, st);}
+                when "triangle_count_sparse" {repTuple = sparseTriangleCountMsg(cmd, args, st);}
                 when "connect" {
                     if authenticate {
                         repTuple = new MsgTuple("connected to arkouda server tcp://*:%i as user %s with token %s".format(

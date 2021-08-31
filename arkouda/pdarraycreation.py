@@ -214,7 +214,6 @@ def array(a: Union[pdarray, np.ndarray, Iterable]) -> Union[pdarray, Strings]:
         name = uncache_array(a.dtype, a.size)
         req_msg = "{} {} {:n} ". \
                         format(a.dtype.name, name, size).encode() + struct.pack(fmt, *a)
-        #print(req_msg)
         arr = pdarray(cmd,req_msg)
         repMsg = generic_msg(cmd = cmd, args=req_msg, send_bytes=True, return_value_needed=True, arr_id=arr.name, my_pdarray=[arr])
         fields = repMsg.split()

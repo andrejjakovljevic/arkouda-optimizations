@@ -12,7 +12,7 @@ from arkouda.pdarrayclass import pdarray, create_pdarray, check_arr, uncache_arr
 from arkouda.strings import Strings
 from arkouda.pdarraycreation import from_series
 
-__all__ = ["count_frequencies", "move_records", "cumsum", "remove_duplicates", "make_from_csv", "transpose", "triangle_count"
+__all__ = ["count_frequencies", "move_records", "cumsum", "remove_duplicates", "make_from_csv", "transpose", "triangle_count", "triangle_count_sparse"
            ]
 
 def count_frequencies(a: pdarray, b: pdarray, n: int, l: list) -> int:
@@ -51,7 +51,6 @@ def make_from_csv(fileName: str, listOfTypes, ns: list):
         cmd = "get_from_csv"
         cmd_args = "{}\n{}\n{}".format(s, listOfTypes, ns[i])
         test = cmd_args.split("\n")[-1]
-        print('test=',test)     
         myType = akint64
         if (listOfTypes[ns[i]]=='float64'):
             myType = akfloat64
@@ -85,12 +84,19 @@ def transpose(listOfPdarrays: list) -> list:
     repMsg = generic_msg(cmd, args, create_pdarray=True, arr_id=ret_names, my_pdarray=listOfPdarrays+ret)
     return ret
 
-def triangle_count(listOfPrdarrays: list) -> list:
+def triangle_count(listOfPrdarrays: list) -> int:
     n = len(listOfPrdarrays)
     args = str(n)
     for p in listOfPrdarrays:
         args +=" "+p.name
     cmd = "triangle_count"
     repMsg = generic_msg(cmd, args, return_value_needed=True, my_pdarray=listOfPrdarrays)
+    k = repMsg.split(' ')[1]
+    return int(k)
+
+def triangle_count_sparse(n: int, pda1: pdarray, pda2: pdarray, pda3: pdarray, pda4: pdarray) -> int:
+    args = str(n)+" "+pda1.name+" "+pda2.name+" "+pda3.name+" "+pda4.name
+    cmd = "triangle_count_sparse"
+    repMsg = generic_msg(cmd, args, return_value_needed=True, my_pdarray=[pda1, pda2, pda3, pda4])
     k = repMsg.split(' ')[1]
     return int(k)

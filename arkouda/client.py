@@ -43,9 +43,17 @@ queue_size: int = 2
 
 q = Queue(queue_size)
 client_to_server_names = {}
+
+# name of pdarray to arguments that create it
 id_to_args = {}
+
+# arguments that create it to name of pdarray
 args_to_id = {}
+
+# name of pdarrays to number of live references
 names_to_number_of_live_references = {}
+
+# name of pdarray to a weak reference of it
 names_to_weakref = {}
 
 # Default dictionary so you can access cached pdarrays as
@@ -588,19 +596,11 @@ def generic_msg(cmd: str, args: Union[str, bytes] = None, send_bytes: bool = Fal
             return ret
         return execute_with_dependencies(buff_item)
 
-    # print("----MAP----")
-    # for (key, value) in client_to_server_names.items():
-    #    print("key=", key, "value=", value)
-
     if buff_emptying or return_value_needed:
         try:
             # Transform the args with client to server names
-            #print(client_to_server_names)
             if not send_bytes:
                 args = transform_args(args)
-            #print("cmd=", cmd)
-            #print("args=",args)
-            #print(create_pdarray)
             # Send the message
             if send_bytes:
                 repMsg = _send_binary_message(cmd=cmd,
@@ -613,6 +613,7 @@ def generic_msg(cmd: str, args: Union[str, bytes] = None, send_bytes: bool = Fal
                                               recv_bytes=recv_bytes)
 
             if create_pdarray:
+                # transpose returns more then one created pdarray
                 if (cmd!="transpose"):
                     fields = repMsg.split()
                     name = fields[1]
@@ -621,7 +622,6 @@ def generic_msg(cmd: str, args: Union[str, bytes] = None, send_bytes: bool = Fal
                     ndim = int(fields[4])
                     shape = [int(el) for el in fields[5][1:-1].split(',')]
                     itemsize = int(fields[6])
-                    #print("Here!")
                     logger.debug(("created Chapel array with name: {} dtype: {} size: {} ndim: {} shape: {} " +
                                 "itemsize: {}").format(name, mydtype, size, ndim, shape, itemsize))
                     client_to_server_names[arr_id] = name
@@ -629,7 +629,6 @@ def generic_msg(cmd: str, args: Union[str, bytes] = None, send_bytes: bool = Fal
                     fields = repMsg.split()
                     for i in range(1, len(arr_id)+1):
                         client_to_server_names[arr_id[i-1]]=fields[i]
-            # print("repmsg=",repMsg)
             return repMsg
 
         except KeyboardInterrupt as e:
@@ -756,7 +755,9 @@ class BufferItem:
         return "Buffer Item, Cmd={0}, Args={1}, Pdarray_id={2}".format(self.cmd, self.args, self.pdarray_id)
 
     def execute(self):
-        # print("executing",self)
+        """
+            Execute a a buffer item
+        """
         used = None
         self.executed = True
         ret = False
@@ -765,6 +766,7 @@ class BufferItem:
             ret.append(delete_from_args_map(info[0]))
         for info in self.my_pd_array:
             if (names_to_number_of_live_references[info[0]]==0):
+                # See if we can reuse some temporaries right now
                 if (self.cmd=="binopvv" or self.cmd=="binopvs" or self.cmd=="binopsv" or self.cmd=="arange" or self.cmd == "randint"):
                     if (info[1]==names_to_weakref[self.pdarray_id]().dtype and int(info[2])==names_to_weakref[self.pdarray_id]().size):
                         self.cmd+='Store'
@@ -785,7 +787,9 @@ class BufferItem:
         return retMsg
 
 def buff_push(item: BufferItem):
-    #item.args=transform_args(item.args)
+    """
+        Add BufferItem to the buffer and execute if the buffer is full
+    """
     q.put(item)
     make_dependencies(item)
     if q.full():
@@ -799,13 +803,14 @@ def is_temporary(arg: str):
         return False
 
 def make_dependencies(item: BufferItem):
+    """
+        Make all dependecies of a given BufferItem
+    """
     # print('starting length of dependencies:',len(item.dependencies))
     if item.args is None:
         return
     args_list = item.args.split(" ")
-    # args_list = args_list[1:]
     args_list = list(filter(is_temporary, args_list))
-    # print("args_list=",args_list)
     for q_elem in reversed(list(q.queue)):
         if (q_elem is item):
             continue
@@ -815,10 +820,8 @@ def make_dependencies(item: BufferItem):
         if (q_elem.pdarray_id!=None):
             if (isinstance(q_elem.pdarray_id,list)):
                 args_list_q_elem.extend(q_elem.pdarray_id)
-                #print(args_list_q_elem)
             else:
                 args_list_q_elem.append(q_elem.pdarray_id)
-        # args_list_q_elem=list(filter(is_temporary, args_list_q_elem))
         for arg_q_elem in args_list_q_elem:
             if arg_q_elem in args_list and not(q_elem in item.dependencies):
                 item.dependencies.append(weakref.ref(q_elem))
@@ -850,7 +853,6 @@ def transform_args(args: str):
     return s
 
 def execute_with_dependencies(item: BufferItem):
-    #print("[Executing with depedencies]:",item)
     if (item.executed):
         return
     for dependency in item.dependencies:
@@ -864,7 +866,6 @@ def buff_empty():
     q.get().execute()
     if not q.empty():
         buff_empty()
-        # print("New Queue Size is:", q.qsize())
 
 
 def buff_empty_partial(size):
@@ -872,6 +873,9 @@ def buff_empty_partial(size):
         return q.get().execute()
 
 def find_last(arr):
+    """
+        Find all usages of an array in the current buffer
+    """
     ret = False
     for q_elem in reversed(list(q.queue)):
         if (arr.name in q_elem.args.split(" ")):
@@ -884,6 +888,9 @@ def find_last(arr):
     return ret
 
 def delete_from_args_map(arrName: str):
+    """
+        Delete an array from all the dicionaries (call with the destrcutor)
+    """
     # try:
     logger.debug('deleting pdarray with name {}'.format(arrName))
     # delete all things that are in same arguments
@@ -923,14 +930,12 @@ def delete_from_args_map(arrName: str):
     
 
 def cache_array(arrName: str, arrType, arrSize):
+    """
+        Cache the array to be reused (called with the destructor)
+    """
     if (sys.meta_path is None):
         return
-    #print("name=", arrName)
     if arrName not in client_to_server_names.keys():
         return
-    #print("----MAP----")
-    #for (key, value) in client_to_server_names.items():
-    #    print("key=", key, "value=", value)
-    #print("Caching ", client_to_server_names[arrName], arrSize, arrType)
     cache[arrType][arrSize].add(client_to_server_names[arrName])
     client_to_server_names.pop(arrName)

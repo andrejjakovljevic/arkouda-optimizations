@@ -915,6 +915,10 @@ module OperatorMsg
         return new MsgTuple(repMsg, MsgType.NORMAL);
     }
 
+    /*
+        Parse and respond to binopsvStoreMsg (not all operators implemented)
+    */
+
     proc binopsvStoreMsg(cmd: string, payload: string, st: borrowed SymTab): MsgTuple throws {
         param pn = Reflection.getRoutineName();
         var repMsg: string = ""; // response message
