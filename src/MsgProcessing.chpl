@@ -892,8 +892,7 @@ module MsgProcessing
     proc splice(k, pointers, indexes) 
     {
         var left = pointers[k];
-        var right = pointers.size - 1;
-        if (k<=pointers.size-1) then right = pointers[k+1]-1;
+        var right = pointers[k+1]-1;
         return indexes[left..right];
     }
 
@@ -910,7 +909,7 @@ module MsgProcessing
     :throws: `UndefinedSymbolError(name)`
     */
 
-    proc sparseTriangleCountMsg(cmd: string, payload: string, st: borrowed SymTab): MsgTuple throws {
+  /*  proc sparseTriangleCountMsg(cmd: string, payload: string, st: borrowed SymTab): MsgTuple throws {
         param pn = Reflection.getRoutineName();
         var (nStr, name1, name2, name3, name4) = payload.splitMsgToTuple(5);
         var n: int = nStr: int;
@@ -924,16 +923,63 @@ module MsgProcessing
         var indexesReal2 = toSymEntry(indexes2, int);
         var k: int = 0;
         var s: int = 0;
-        var help2: [0..indexesReal.a.size-1] int;
+        var D: domain(int, parSafe=false) = {0..(indexesReal.a.size-1)};
+        var help2: [D] int = 0;
         forall i in 0..p.a.size-2 do {
             if (p.a[i]<p.a[i+1])
             {
-                forall j in p.a[i]..p.a[i+1] do {
-                    help2[j] = mergeArraysCount(splice(i, p.a, indexesReal.a),splice(indexesReal.a[j],p2.a, indexesReal2.a));
+                forall j in p.a[i]..p.a[i+1]-1 do {
+                    var first = splice(i, p.a, indexesReal.a);
+                    var second = splice(indexesReal.a[j], p2.a, indexesReal2.a);
+                    help2[j] = mergeArraysCount(first, second, p.a[i],p2.a[indexesReal.a[j]]);
+                    //help2[j] = mergeArraysCount(splice(i, p.a, indexesReal.a),splice(indexesReal.a[j],p2.a, indexesReal2.a),p.a[i], p2.a[indexesReal.a[j]]);
                 }
             }
+            //writeln("i=",i)
         }
         s = + reduce help2;
+        var repMsg: string = "int64 %i".format(s);
+        return new MsgTuple(repMsg, MsgType.NORMAL); 
+    }*/
+
+    proc sparseTriangleCountMsg(cmd: string, payload: string, st:borrowed SymTab) : MsgTuple throws {
+        param pn = Reflection.getRoutineName();
+        var (nStr, name1, name2, name3, name4) = payload.splitMsgToTuple(5);
+        var n: int = nStr: int;
+        var pointer: borrowed GenSymEntry = st.lookup(name1);
+        var pointer2: borrowed GenSymEntry = st.lookup(name3);
+        var p = toSymEntry(pointer, int);
+        var p2 = toSymEntry(pointer2, int);
+        var indexes: borrowed GenSymEntry = st.lookup(name2);
+        var indexes2: borrowed GenSymEntry = st.lookup(name4);
+        var indexesReal = toSymEntry(indexes, int);
+        var indexesReal2 = toSymEntry(indexes2, int);
+        var s: int = 0;
+        var l1: sync bool;
+        var kr0: [p.aD] (p.etype,int) = [(key,rank) in zip(p.a,p.aD)] (key,rank);
+        coforall loc in Locales with (+ reduce s) {
+            on loc {
+                var locS: int = 0;
+                coforall task in Tasks with (+ reduce locS) {
+                    // get local domain's indices
+                    var lD = kr0.localSubdomain();
+                    // calc task's indices from local domain's indices
+                    var tD = calcBlock(task, lD.low, lD.high);
+                    if (tD.low<p.a.size && tD.high<p.a.size && tD.low<=tD.high)
+                    { 
+                        for i in tD {
+                            for j in p.a[i]..p.a[i+1]-1 do {
+                                var first = splice(i, p.a, indexesReal.a);
+                                var second = splice(indexesReal.a[j], p2.a, indexesReal2.a);
+                                locS += mergeArraysCount(first, second, p.a[i],p2.a[indexesReal.a[j]]);
+                            }
+                        }
+                    }
+                }//coforall task
+                s+=locS;
+            }//on loc
+        }//coforall loc
+        //s = + reduce help2;
         var repMsg: string = "int64 %i".format(s);
         return new MsgTuple(repMsg, MsgType.NORMAL); 
     }

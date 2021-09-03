@@ -62,11 +62,11 @@ module ArraySetops
       return (d,k);
     }
 
-    proc mergeArraysCount(a: [] ?t, b: [] t) {
-      var k1: int = 0;
-      var k2: int = 0;
+    proc mergeArraysCount(a: [] ?t, b: [] t, left1, left2) {
+      var k1: int = left1;
+      var k2: int = left2;
       var k: int = 0;
-      while (k1<a.size && k2<b.size) do {
+      while (k1<left1+a.size && k2<left2+b.size) do {
         if (a[k1]<b[k2]) then {
           k1+=1;
         }
