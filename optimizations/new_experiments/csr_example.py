@@ -28,13 +28,13 @@ def get_matrices(filename):
         datas.append(data)
         #print("i=",i)
         #i+=1
-    s_mat = csr_matrix((datas,(fs, ss)), shape=(4096, 4096))
+    s_mat = csr_matrix((datas,(fs, ss)), shape=(32768, 32768))
     s_mat_t = csc_matrix(s_mat)
     return (s_mat,s_mat_t)
 
 
-ak.connect(connect_url='tcp://nlogin2:5555')
-(s_mat, s_mat_t) = get_matrices("/home/an58/delaunay_n12.mtx")
+ak.connect(connect_url='tcp://bc12u11n3:5555')
+(s_mat, s_mat_t) = get_matrices("/home/an58/delaunay_n15.mtx")
 dat_real = s_mat.data.astype(np.int64)
 indexes = s_mat.indices.astype(np.int64)
 pointers = s_mat.indptr.astype(np.int64)
@@ -48,14 +48,14 @@ pd_indexes = ak.array(indexes)
 pd_indexes2 = ak.array(indexes2)
 k = 0
 s = 0
-#start = time.perf_counter()
-#for i in range(len(pointers)-1):
-#    right = pointers[i+1]
-#    if (pointers[i]<right):
-#        for j in range(pointers[i],right):
-#            s+= ak.sortIntersect1d(find_splice(i, pointers, pd_indexes), find_splice(pd_indexes[j], pointers2, pd_indexes2)).size
+start = time.perf_counter()
+for i in range(len(pointers)-1):
+    right = pointers[i+1]
+    if (pointers[i]<right):
+        for j in range(pointers[i],right):
+            s+= ak.sortIntersect1d(find_splice(i, pointers, pd_indexes), find_splice(pd_indexes[j], pointers2, pd_indexes2)).size
 
-#print(s)
+print(s)
 end = time.perf_counter()
 print(f"first took {end - start:0.9f} seconds")
 start = time.perf_counter()

@@ -875,14 +875,17 @@ module MsgProcessing
         param pn = Reflection.getRoutineName();
         var list_first = args.split(" ");
         var n : int = list_first[0] : int;
-        var mat : [0..#(n-1), 0..#(n-1)] int;
-        forall i in 0..n-1 do {
+        var mat : [0..(n-1), 0..(n-1)] int;
+        for i in 0..n-1 do {
             var l = st.lookup(list_first[i+1]);
             var l1 = toSymEntry(l, int);
-            forall j in 0..n-1 do {
+            for j in 0..n-1 do {
                 mat[i,j] = l1.a[j];
+                //writeln("k=", mat[i,j]);
             }
         }
+        //writeln(mat);
+        //writeln(dot(mat, mat));
         var new_mat = dot(mat, mat)*mat;
         var s: int = + reduce new_mat;
         var repMsg: string = "int64 %i".format(s);
@@ -982,6 +985,195 @@ module MsgProcessing
         //s = + reduce help2;
         var repMsg: string = "int64 %i".format(s);
         return new MsgTuple(repMsg, MsgType.NORMAL); 
+    }
+
+    proc vectorTimesMatrixMsg(cmd: string, payload: string, st:borrowed SymTab) : MsgTuple throws {
+        param pn = Reflection.getRoutineName();
+        var list_first = payload.split(" ");
+        var n : int = list_first[0] : int;
+        var myType1: string = list_first[1] : string;
+        var myType2: string = list_first[2] : string;
+        var input_list_names : [0..n-1] string;
+        forall i in 0..n-1 do {
+            input_list_names[i] = list_first[i+4];
+        }
+        var v = st.lookup(list_first[3]);
+        if (myType1=="int64" && myType2=="int64") then {
+            var v_real = toSymEntry(v, int);
+            var res_name: string = st.nextName();
+            st.addEntry(res_name, n, int);
+            var res1 =  st.lookup(res_name);
+            var res = toSymEntry(res1,int);
+            var l_list: [0..n-1] [0..n-1] int;
+            forall i in 0..n-1 do {
+                var l =  st.lookup(input_list_names[i]);
+                var l1 = toSymEntry(l,int);
+                forall j in 0..n-1 do {
+                    l_list[j][i]=l1.a[j];
+                }
+            }
+            forall i in 0..n-1 do {
+                res.a[i] = + reduce (l_list[i] * v_real.a);
+            }
+            var repMsg: string = "created %s".format(st.attrib(res_name));
+            omLogger.debug(getModuleName(),getRoutineName(),getLineNumber(),repMsg);
+            return new MsgTuple(repMsg, MsgType.NORMAL);
+        }
+        else if (myType1=="float64" && myType2=="int64") then {
+            var v_real = toSymEntry(v, real);
+            var res_name: string = st.nextName();
+            st.addEntry(res_name, n, real);
+            var res1 =  st.lookup(res_name);
+            var res = toSymEntry(res1,real);
+            var l_list: [0..n-1] [0..n-1] int;
+            forall i in 0..n-1 do {
+                var l =  st.lookup(input_list_names[i]);
+                var l1 = toSymEntry(l,int);
+                forall j in 0..n-1 do {
+                    l_list[j][i]=l1.a[j];
+                }
+            }
+            forall i in 0..n-1 do {
+                res.a[i] = (+ reduce l_list[i]) * v_real.a[i];
+            }
+            var repMsg: string = "created %s".format(st.attrib(res_name));
+            omLogger.debug(getModuleName(),getRoutineName(),getLineNumber(),repMsg);
+            return new MsgTuple(repMsg, MsgType.NORMAL);
+        }
+        else if (myType1=="int64" && myType2=="float64") then {
+            var v_real = toSymEntry(v, int);
+            var res_name: string = st.nextName();
+            st.addEntry(res_name, n, int);
+            var res1 =  st.lookup(res_name);
+            var res = toSymEntry(res1,real);
+            var l_list: [0..n-1] [0..n-1] real;
+            forall i in 0..n-1 do {
+                var l =  st.lookup(input_list_names[i]);
+                var l1 = toSymEntry(l,real);
+                forall j in 0..n-1 do {
+                    l_list[j][i]=l1.a[j];
+                }
+            }
+            forall i in 0..n-1 do {
+                res.a[i] = (+ reduce l_list[i]) * v_real.a[i];
+            }
+            var repMsg: string = "created %s".format(st.attrib(res_name));
+            omLogger.debug(getModuleName(),getRoutineName(),getLineNumber(),repMsg);
+            return new MsgTuple(repMsg, MsgType.NORMAL);
+        }
+        else if (myType1=="float64" && myType2=="float64") then {
+            var v_real = toSymEntry(v, real);
+            var res_name: string = st.nextName();
+            st.addEntry(res_name, n, real);
+            var res1 =  st.lookup(res_name);
+            var res = toSymEntry(res1,real);
+            var l_list: [0..n-1] [0..n-1] real;
+            forall i in 0..n-1 do {
+                var l =  st.lookup(input_list_names[i]);
+                var l1 = toSymEntry(l,real);
+                forall j in 0..n-1 do {
+                    l_list[j][i]=l1.a[j];
+                }
+            }
+            forall i in 0..n-1 do {
+                res.a[i] = (+ reduce l_list[i]) * v_real.a[i];
+            }
+            var repMsg: string = "created %s".format(st.attrib(res_name));
+            omLogger.debug(getModuleName(),getRoutineName(),getLineNumber(),repMsg);
+            return new MsgTuple(repMsg, MsgType.NORMAL);
+        }
+        else return new MsgTuple("", MsgType.ERROR);
+    }
+
+    proc matrixTimesVectorMsg(cmd: string, payload: string, st:borrowed SymTab): MsgTuple throws {
+        param pn = Reflection.getRoutineName();
+        var list_first = payload.split(" ");
+        var n : int = list_first[0] : int;
+        var myType1: string = list_first[1] : string;
+        var myType2: string = list_first[2] : string;
+        var input_list_names : [0..n-1] string;
+        var v = st.lookup(list_first[3]);
+        forall i in 0..n-1 do {
+            input_list_names[i] = list_first[i+4];
+        }
+        if (myType1=="int64" && myType2=="int64") then {
+            var v_real = toSymEntry(v, int);
+            var res_name: string = st.nextName();
+            st.addEntry(res_name, n, int);
+            var res1 =  st.lookup(res_name);
+            var res = toSymEntry(res1,int);
+            forall i in 0..n-1 do {
+                var l =  st.lookup(input_list_names[i]);
+                var l1 = toSymEntry(l,int);
+                res.a[i] = + reduce (l1.a * v_real.a);
+            }
+            var repMsg: string = "created %s".format(st.attrib(res_name));
+            omLogger.debug(getModuleName(),getRoutineName(),getLineNumber(),repMsg);
+            return new MsgTuple(repMsg, MsgType.NORMAL);
+        }
+        else if (myType1=="float64" && myType2=="int64") then {
+            var v_real = toSymEntry(v, real);
+            var res_name: string = st.nextName();
+            st.addEntry(res_name, n, real);
+            var res1 =  st.lookup(res_name);
+            var res = toSymEntry(res1,real);
+            forall i in 0..n-1 do {
+                var l =  st.lookup(input_list_names[i]);
+                var l1 = toSymEntry(l,int);
+                res.a[i] = + reduce (l1.a * v_real.a);
+            }
+            var repMsg: string = "created %s".format(st.attrib(res_name));
+            omLogger.debug(getModuleName(),getRoutineName(),getLineNumber(),repMsg);
+            return new MsgTuple(repMsg, MsgType.NORMAL);
+        }
+        else if (myType1=="int64" && myType2=="float64") then {
+            var v_real = toSymEntry(v, int);
+            var res_name: string = st.nextName();
+            st.addEntry(res_name, n, real);
+            var res1 =  st.lookup(res_name);
+            var res = toSymEntry(res1,real);
+            forall i in 0..n-1 do {
+                var l =  st.lookup(input_list_names[i]);
+                var l1 = toSymEntry(l,real);
+                res.a[i] = + reduce (l1.a * v_real.a);
+            }
+            var repMsg: string = "created %s".format(st.attrib(res_name));
+            omLogger.debug(getModuleName(),getRoutineName(),getLineNumber(),repMsg);
+            return new MsgTuple(repMsg, MsgType.NORMAL);
+        }
+        else if (myType1=="float64" && myType2=="float64") then {
+            var v_real = toSymEntry(v, real);
+            var res_name: string = st.nextName();
+            st.addEntry(res_name, n, real);
+            var res1 =  st.lookup(res_name);
+            var res = toSymEntry(res1,real);
+            forall i in 0..n-1 do {
+                var l =  st.lookup(input_list_names[i]);
+                var l1 = toSymEntry(l,real);
+                res.a[i] = + reduce (l1.a * v_real.a);
+            }
+            var repMsg: string = "created %s".format(st.attrib(res_name));
+            omLogger.debug(getModuleName(),getRoutineName(),getLineNumber(),repMsg);
+            return new MsgTuple(repMsg, MsgType.NORMAL);
+        }
+        else return new MsgTuple("", MsgType.ERROR);
+    }
+
+    proc inverseVectorMsg(cmd: string, payload: string, st:borrowed SymTab) : MsgTuple throws {
+        var name: string = payload;
+        var input1 =  st.lookup(name);
+        var input = toSymEntry(input1, int);
+        var res_name: string = st.nextName();
+        st.addEntry(res_name, input.size, int);
+        var res1 =  st.lookup(res_name);
+        var res = toSymEntry(res1,int);
+        forall i in 0..input.a.size do {
+            if (input.a[i]!=0) then res.a[i]=0;
+            else res.a[i]=1;
+        }
+        var repMsg: string = "created %s".format(st.attrib(res_name));
+        omLogger.debug(getModuleName(),getRoutineName(),getLineNumber(),repMsg);
+        return new MsgTuple(repMsg, MsgType.NORMAL);
     }
 
 }

@@ -1,7 +1,9 @@
+from arkouda.pdarrayfunctions import vector_times_matrix
 import arkouda as ak
 import numpy as np
 import time
 import random
+from scipy.sparse import csr_matrix
 
 def triangle_count_numpy(L:np.ndarray, nblocks_m, nblocks_n, nblocks_l, verbose):
     """
@@ -155,7 +157,7 @@ def betweenness_centrality_1d():
     # GrB Matrix new(&sigma , GrB INT32 , n , n ) ;
     sigma = ak.ones(n, ak.int64)
 
-    # GrB Vector q ;
+    # GrB Vector q;
     # GrB Vector new(&q , GrB INT32 , n ) ;
     q = ak.ones(n, ak.int64)
     # GrB Vector setElement ( q , 1 , s ) ;
@@ -190,7 +192,7 @@ def betweenness_centrality_1d():
         d=d+1
         if (d==r):
             break
-    print("number of iterations:",d)
+    #print("number of iterations:",d)
     # GrB Vector t 1 ; GrB Vector new(&t1 , GrB FP32 , n ) ; for t1-t4
     # t1 = ak.zeros(n, ak.int64)
     # t2 = ak.zeros(n, ak.int64)
@@ -213,18 +215,78 @@ def betweenness_centrality_1d():
         t4 = sigma[(i - 1)] * t3
         # GrB eWiseAdd (∗ d el t a , GrB NULL, GrB NULL, GrB PLUS FP32 , ∗ d el t a , t4 , GrB NULL ) ;
         delta = delta + t4
-        print(delta)
     #ak.shutdown()
 
+def get_matrices(filename):
+    f = open(filename, "r")
+    fs = []
+    ss = []
+    datas = []
+    for x in f:
+        if (x=="\n"):
+            continue
+        spl = x.split(' ')
+        f = int(spl[0])
+        s = int(spl[1])
+        data = float(spl[2])
+        fs.append(f)
+        ss.append(s)
+        datas.append(data)
+    s_mat = csr_matrix((datas,(fs, ss)), shape=(4, 4))
+    s_mat_t = s_mat.transpose(axes = None, copy=True)
+    return (s_mat,s_mat_t)
 
-def betweenness_centrality():
-    """
-    Implements the triangle count algorithm
-    treating the input adjacency matrix as a regular matrix.
-    """
-    ak.connect(connect_url='tcp://MacBook-Pro.local:5555')
-    ak.shutdown()
+def create_blocks_scalar(A: np.ndarray):
+    out = []
+    for k in A:
+        out.append(ak.array(k))
+    return out
 
+def betweenness_centrality(A: list, s: int):
+    n = len(A)
+    delta = ak.zeros(n)
+    sigma = []
+    for i in range(n):
+        sigma.append(ak.zeros(n, np.int64))
+    q = ak.zeros(n, np.int64)
+    q[s]=1
+    p=q
+    d = 0
+    sum = 0
+    while (True):
+        # Only doing one iteration
+        # GrB assign ( sigma , GrB NULL, GrB NULL, q , d , GrB ALL , n , GrB NULL ) ;
+        sigma[d] = q
+        # GrB eWiseAdd ( p , GrB NULL, GrB NULL, GrB PLUS INT32 , p , q , GrB NULL ) ;
+        p = p + q
+        # GrB vxm ( q , p , GrB NULL, GrB PLUS TIMES SEMIRING INT32 ,q ,A, GrB DESC RC ) ;
+        #print(ak.vector_times_matrix(n,q,A))
+        q = ak.vector_times_matrix(n, q, A)*ak.inverse(p)
+        # GrB reduce(&sum , GrB NULL, GrB PLUS MONOID INT32 , q , GrB NULL ) ;
+        sum = ak.sum(q)
+        d+=1
+        if (sum==0):
+            break
+    for k in sigma:
+        print("k=",k)
+    for i in range(d-1, 0, -1):
+        # GrB assign ( t1 , GrB NULL, GrB NULL, 1 . 0 f , GrB ALL , n , GrB NULL ) ;
+        t1 = ak.ones(n, ak.int64)
+        # GrB eWiseAdd ( t1 , GrB NULL, GrB NULL, GrB PLUS MONOID FP32, t1 , ∗ delta , GrB NULL ) ;
+        t1 = t1 + delta
+        # G rB e x t r ac t ( t2 , GrB NULL, GrB NULL, sigma , GrB ALL , n , i , GrB DESC T0 ) ;
+        t2 = sigma[i]
+        # GrB eWiseMult ( t2 , GrB NULL, GrB NULL, GrB DIV FP32 , t1 , t2 , GrB NULL ) ;
+        t2 = (t2 / t1) 
+        # GrB mxv ( t3 , GrB NULL, GrB NULL, GrB PLUS TIMES SEMIRING FP32 , A, t2 , GrB NULL ) ;
+        t3 = ak.matrix_times_vector(n,t2,A)
+        # G rB e x t r ac t ( t4 , GrB NULL, GrB NULL, sigma , GrB ALL , n , i −1,GrB DESC T0 ) ;
+        t4 = sigma[(i - 1)]
+        # GrB eWiseMult ( t4 , GrB NULL, GrB NULL, GrB TIMES FP32 , t4 , t3 , GrB NULL ) ;
+        t4 = t4 * t3
+        # GrB eWiseAdd (∗ d el t a , GrB NULL, GrB NULL, GrB PLUS FP32 , ∗ d el t a , t4 , GrB NULL ) ;
+        delta = delta + t4
+    print(delta)
 
 # betweenness_centrality_1d()
 
@@ -235,7 +297,7 @@ x = np.array([[0, 0, 0, 0],
 # print(triangle_count_numpy(x, 2, 2, 2, False))
 
 
-ak.connect(connect_url='tcp://andrej-X556UQ:5555')
+ak.connect(connect_url='tcp://nlogin3:5555')
 # x = ak.randint(0, 10, 100)
 # y = ak.randint(0, 10, 100)
 # z = x + y
@@ -243,7 +305,10 @@ ak.connect(connect_url='tcp://andrej-X556UQ:5555')
 # y = ak.randint(0, 10, 100)
 # print(y.client_name)
 start = time.perf_counter()
-print(betweenness_centrality_1d())
+(s_mat, s_mat_t) = get_matrices("/home/an58/help_new.mtx")
+dense1 = s_mat.todense().tolist()
+mat = create_blocks_scalar(np.array(dense1,np.int64))
+betweenness_centrality(mat, 2)
 end = time.perf_counter()
 print(f"triangle count took {end - start:0.9f} seconds")
 

@@ -2,18 +2,18 @@ import numpy as np  # type: ignore
 import pandas as pd  # type: ignore
 import struct
 from typing import cast, Iterable, Optional, Union
-from typeguard import typechecked
+from typeguard import check_type, typechecked
 from arkouda.client import generic_msg, id_to_args, args_to_id
-from arkouda.dtypes import structDtypeCodes, NUMBER_FORMAT_STRINGS, float64 as akint64, int64 as akfloat64, bool as akbool, \
+from arkouda.dtypes import structDtypeCodes, NUMBER_FORMAT_STRINGS, float64 as akfloat64, int64 as akint64, bool as akbool, \
     DTypes, isSupportedInt, isSupportedNumber, NumericDTypes, SeriesDTypes, \
     int_scalars, numeric_scalars
 from arkouda.dtypes import dtype as akdtype
 from arkouda.pdarrayclass import pdarray, create_pdarray, check_arr, uncache_array, create_pdarray_with_name, parse_single_value
 from arkouda.strings import Strings
-from arkouda.pdarraycreation import from_series
+from arkouda.pdarraycreation import array, from_series
 
-__all__ = ["count_frequencies", "move_records", "cumsum", "remove_duplicates", "make_from_csv", "transpose", "triangle_count", "triangle_count_sparse"
-           ]
+__all__ = ["count_frequencies", "move_records", "cumsum", "remove_duplicates", "make_from_csv", "transpose", "triangle_count", "triangle_count_sparse",
+           "vector_times_matrix", "inverse", "matrix_times_vector"]
 
 def count_frequencies(a: pdarray, b: pdarray, n: int, l: list) -> int:
     cmd = "count_frequencies"
@@ -80,7 +80,6 @@ def transpose(listOfPdarrays: list) -> list:
     for i in range(n):
         arr = pdarray(cmd, args, listOfPdarrays[0].dtype, listOfPdarrays[0].size, listOfPdarrays[0].ndim, listOfPdarrays[0].shape, listOfPdarrays[0].itemsize)
         ret.append(arr)
-        ret_names.append(arr.name)
     repMsg = generic_msg(cmd, args, create_pdarray=True, arr_id=ret_names, my_pdarray=listOfPdarrays+ret)
     return ret
 
@@ -100,3 +99,46 @@ def triangle_count_sparse(n: int, pda1: pdarray, pda2: pdarray, pda3: pdarray, p
     repMsg = generic_msg(cmd, args, return_value_needed=True, my_pdarray=[pda1, pda2, pda3, pda4])
     k = repMsg.split(' ')[1]
     return int(k)
+
+def vector_times_matrix(n: int, pda1: pdarray, list_of_arrays: list):
+    type1 = "int64"
+    type2 = "int64"
+    if (pda1.dtype==akfloat64):
+        type1="float64"
+    if (list_of_arrays[0].dtype==akfloat64):
+        type2="float64"
+    args = str(n)+" "+type1+" "+type2+" "+pda1.name
+    for ar in list_of_arrays:
+        args+=" "+ar.name
+    cmd = "vector_times_matrix"
+    arr = pdarray(cmd, args, pda1.dtype, pda1.size, pda1.ndim, pda1.shape, pda1.dtype.itemsize)
+    repMsg = generic_msg(cmd, args, create_pdarray=True,arr_id=arr.name, my_pdarray=[list_of_arrays+[pda1, arr]])
+    return arr
+
+def matrix_times_vector(n: int, pda1: pdarray, list_of_arrays: list):
+    type1 = "int64"
+    type2 = "int64"
+    if (pda1.dtype==akfloat64):
+        type1="float64"
+    if (list_of_arrays[0].dtype==akfloat64):
+        type2="float64"
+    check_type = akint64
+    if (type1=="float64" or type2=="float64"):
+        check_type=akfloat64
+    if (check_arr(check_type)):
+        return matrix_times_vector_store(n, pda1, list_of_arrays)
+    else:
+        args = str(n)+" "+type1+" "+type2+" "+pda1.name
+        for ar in list_of_arrays:
+            args+=" "+ar.name
+        cmd = "matrix_times_vector"
+        arr = pdarray(cmd, args, pda1.dtype, pda1.size, pda1.ndim, pda1.shape, pda1.dtype.itemsize)
+        repMsg = generic_msg(cmd, args, create_pdarray=True, arr_id=arr.name, my_pdarray=[list_of_arrays+[pda1, arr]])
+        return arr
+
+def inverse(pda1: pdarray):
+    args = pda1.name
+    cmd="inverse_vector"
+    arr = pdarray(cmd, args, pda1.dtype, pda1.size, pda1.ndim, pda1.shape, pda1.dtype.itemsize)
+    repMsg = generic_msg(cmd, args, create_pdarray=True,arr_id=arr.name, my_pdarray=[pda1, arr])
+    return arr

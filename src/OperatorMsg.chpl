@@ -1781,6 +1781,105 @@ module OperatorMsg
                     }
                 }
             }
+            when (DType.Int64, DType.Float64) {
+                var l = toSymEntry(left,int);
+                var r = toSymEntry(right,real);
+                var s = toSymEntry(res,real);
+                s.hasMin = false;
+                s.hasMax = false;
+                select op
+                {
+                    when "+" {
+                        s.a = l.a + r.a;
+                    }
+                    when "-" {
+                        s.a = l.a - r.a;
+                    }
+                    when "*" {
+                        s.a = l.a * r.a;
+                    }
+                    when "/" {
+                        s.a = l.a / r.a;
+                    }
+                    when "//" {
+                        ref sa = s.a;
+                        ref la = l.a;
+                        ref ra = r.a;
+                        [(si,li,ri) in zip(sa,la,ra)] si = if ri != 0 then li/ri else 0;
+                    }
+                    otherwise {
+                        var errorMsg = notImplementedError(pn,left.dtype,op,right.dtype);
+                        omLogger.error(getModuleName(),getRoutineName(),getLineNumber(),errorMsg);
+                        return new MsgTuple(errorMsg, MsgType.ERROR);
+                    }
+                }
+            }
+            when (DType.Float64, DType.Int64) {
+                var l = toSymEntry(left,real);
+                var r = toSymEntry(right,int);
+                var s = toSymEntry(res,real);
+                s.hasMin = false;
+                s.hasMax = false;
+                select op
+                {
+                    when "+" {
+                        s.a = l.a + r.a;
+                    }
+                    when "-" {
+                        s.a = l.a - r.a;
+                    }
+                    when "*" {
+                        s.a = l.a * r.a;
+                    }
+                    when "/" {
+                        s.a = l.a / r.a;
+                    }
+                    when "//" {
+                        ref sa = s.a;
+                        ref la = l.a;
+                        ref ra = r.a;
+                        [(si,li,ri) in zip(sa,la,ra)] si = if ri != 0 then li/ri else 0;
+                    }
+                    otherwise {
+                        var errorMsg = notImplementedError(pn,left.dtype,op,right.dtype);
+                        omLogger.error(getModuleName(),getRoutineName(),getLineNumber(),errorMsg);
+                        return new MsgTuple(errorMsg, MsgType.ERROR);
+                    }
+                }
+            }
+            when (DType.Float64, DType.Float64) {
+                var l = toSymEntry(left,real);
+                var r = toSymEntry(right,real);
+                var s = toSymEntry(res,real);
+                s.hasMin = false;
+                s.hasMax = false;
+                select op
+                {
+                    when "+" {
+                        s.a = l.a + r.a;
+                    }
+                    when "-" {
+                        s.a = l.a - r.a;
+                    }
+                    when "*" {
+                        s.a = l.a * r.a;
+                    }
+                    when "/" {
+                        s.a = l.a / r.a;
+                    }
+                    when "//" {
+                        ref sa = s.a;
+                        ref la = l.a;
+                        ref ra = r.a;
+                        [(si,li,ri) in zip(sa,la,ra)] si = if ri != 0 then li/ri else 0;
+                    }
+                    otherwise {
+                        var errorMsg = notImplementedError(pn,left.dtype,op,right.dtype);
+                        omLogger.error(getModuleName(),getRoutineName(),getLineNumber(),errorMsg);
+                        return new MsgTuple(errorMsg, MsgType.ERROR);
+                    }
+                }
+            }
             otherwise {
                 var errorMsg = unrecognizedTypeError(pn,
                                   "("+dtype2str(left.dtype)+","+dtype2str(right.dtype)+")");

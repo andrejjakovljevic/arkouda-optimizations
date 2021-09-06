@@ -255,7 +255,10 @@ class pdarray:
                 raise ValueError("size mismatch {} {}".format(self.size, other.size))
             cmd = "binopvv"
             args = "{} {} {}".format(op, self.name, other.name)
-            arr = pdarray(cmd=cmd, cmd_args=args, mydtype=self.dtype, size=self.size,
+            myType = self.dtype
+            if (self.dtype==akfloat64 or other.dtype==akfloat64 or op=='/'):
+                myType=akfloat64
+            arr = pdarray(cmd=cmd, cmd_args=args, mydtype=myType, size=self.size,
                           ndim=1, shape=self.shape, itemsize=self.itemsize)
             generic_msg(cmd=cmd, args=args, create_pdarray=True, arr_id=arr.name, my_pdarray=[self, other, arr])
             return arr
@@ -337,7 +340,7 @@ class pdarray:
         if (("+:" + name + ":" + self.name) in args_to_id.keys()):
             return args_to_id[("+:" + name + ":" + self.name)]()
         myType = self.dtype
-        if (self.dtype==akfloat64 or type(other)==np.float64):
+        if (self.dtype==akfloat64 or type(other)==np.float64 or (isinstance(other,pdarray) and other.dtype==akfloat64)):
             myType=akfloat64
         if check_arr(myType, self.size):
             return binOpWithStore(self, other, uncache_array(myType, self.size), "+")
@@ -366,7 +369,7 @@ class pdarray:
             return args_to_id[("-:"+self.name+":"+name)]()
         # print('tip=', type(other))
         myType = self.dtype
-        if (self.dtype==akfloat64 or type(other)==np.float64):
+        if (self.dtype==akfloat64 or type(other)==np.float64 or (isinstance(other,pdarray) and other.dtype==akfloat64)):
             myType=akfloat64
         if check_arr(myType, self.size):
             return binOpWithStore(self, other, uncache_array(myType, self.size), "-")
@@ -395,7 +398,7 @@ class pdarray:
         if (("*:" + name + ":" + self.name) in args_to_id.keys() and args_to_id[("*:" + name + ":" + self.name)]() is not None):
             return args_to_id[("*:" + name + ":" + self.name)]()
         myType = self.dtype
-        if (self.dtype==akfloat64 or type(other)==np.float64):
+        if (self.dtype==akfloat64 or type(other)==np.float64 or (isinstance(other,pdarray) and other.dtype==akfloat64)):
             myType=akfloat64
         # print('mul type ',myType,' size ', self.size)
         if check_arr(myType, self.size):
@@ -2071,7 +2074,7 @@ def unregister_pdarray_by_name(user_defined_name:str) -> None:
 def binOpWithStore(pda_left: pdarray, pda_right: pdarray, pda_store_name: str, binop: str) -> pdarray:
     if isinstance(pda_right, pdarray) and isinstance(pda_left, pdarray):
         cmd = "binopvvStore"
-        arr = create_pdarray_with_name(pda_store_name, cmd, "", pda_left.dtype, pda_left.size, pda_left.ndim,
+        arr = create_pdarray_with_name(pda_store_name, cmd, "", (akfloat64 if binop=="/" else pda_left.dtype), pda_left.size, pda_left.ndim,
                                        pda_left.shape, pda_left.itemsize)
         args = "{} {} {} {}". \
             format(binop, pda_left.name, pda_right.name, arr.name)

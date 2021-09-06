@@ -601,6 +601,8 @@ def generic_msg(cmd: str, args: Union[str, bytes] = None, send_bytes: bool = Fal
             # Transform the args with client to server names
             if not send_bytes:
                 args = transform_args(args)
+            #print("cmd=",cmd)
+            #print("args=",args)
             # Send the message
             if send_bytes:
                 repMsg = _send_binary_message(cmd=cmd,
