@@ -242,33 +242,31 @@ def create_blocks_scalar(A: np.ndarray):
         out.append(ak.array(k))
     return out
 
-def betweenness_centrality(A: list, s: int):
+def betweenness_centrality(A: list, source: int):
     n = len(A)
     delta = ak.zeros(n)
     sigma = []
     for i in range(n):
-        sigma.append(ak.zeros(n, np.int64))
-    q = ak.zeros(n, np.int64)
-    q[s]=1
+        sigma.append(ak.zeros(n, np.float64))
+    q = ak.zeros(n, np.float64)
+    q[source]=1
     p=q
     d = 0
     sum = 0
+    #print("sss=",ak.inverse(p))
     while (True):
-        # Only doing one iteration
         # GrB assign ( sigma , GrB NULL, GrB NULL, q , d , GrB ALL , n , GrB NULL ) ;
         sigma[d] = q
         # GrB eWiseAdd ( p , GrB NULL, GrB NULL, GrB PLUS INT32 , p , q , GrB NULL ) ;
         p = p + q
         # GrB vxm ( q , p , GrB NULL, GrB PLUS TIMES SEMIRING INT32 ,q ,A, GrB DESC RC ) ;
-        #print(ak.vector_times_matrix(n,q,A))
-        q = ak.vector_times_matrix(n, q, A)*ak.inverse(p)
+        q = ak.vector_times_matrix(n,q,A)*ak.inverse(p)
+        #print("q=",q)
         # GrB reduce(&sum , GrB NULL, GrB PLUS MONOID INT32 , q , GrB NULL ) ;
         sum = ak.sum(q)
         d+=1
         if (sum==0):
             break
-    for k in sigma:
-        print("k=",k)
     for i in range(d-1, 0, -1):
         # GrB assign ( t1 , GrB NULL, GrB NULL, 1 . 0 f , GrB ALL , n , GrB NULL ) ;
         t1 = ak.ones(n, ak.int64)
@@ -277,8 +275,8 @@ def betweenness_centrality(A: list, s: int):
         # G rB e x t r ac t ( t2 , GrB NULL, GrB NULL, sigma , GrB ALL , n , i , GrB DESC T0 ) ;
         t2 = sigma[i]
         # GrB eWiseMult ( t2 , GrB NULL, GrB NULL, GrB DIV FP32 , t1 , t2 , GrB NULL ) ;
-        t2 = (t2 / t1) 
-        # GrB mxv ( t3 , GrB NULL, GrB NULL, GrB PLUS TIMES SEMIRING FP32 , A, t2 , GrB NULL ) ;
+        t2 = (t1 / t2) 
+        # GrB mv ( t3 , GrB NULL, GrB NULL, GrB PLUS TIMES SEMIRING FP32 , A, t2 , GrB NULL ) ;
         t3 = ak.matrix_times_vector(n,t2,A)
         # G rB e x t r ac t ( t4 , GrB NULL, GrB NULL, sigma , GrB ALL , n , i −1,GrB DESC T0 ) ;
         t4 = sigma[(i - 1)]
@@ -286,7 +284,7 @@ def betweenness_centrality(A: list, s: int):
         t4 = t4 * t3
         # GrB eWiseAdd (∗ d el t a , GrB NULL, GrB NULL, GrB PLUS FP32 , ∗ d el t a , t4 , GrB NULL ) ;
         delta = delta + t4
-    print(delta)
+    return delta
 
 # betweenness_centrality_1d()
 
@@ -297,20 +295,26 @@ x = np.array([[0, 0, 0, 0],
 # print(triangle_count_numpy(x, 2, 2, 2, False))
 
 
-ak.connect(connect_url='tcp://nlogin3:5555')
+ak.connect(connect_url='tcp://nlogin2:5555')
 # x = ak.randint(0, 10, 100)
 # y = ak.randint(0, 10, 100)
 # z = x + y
 # print(ak.sum(z))
 # y = ak.randint(0, 10, 100)
 # print(y.client_name)
-start = time.perf_counter()
 (s_mat, s_mat_t) = get_matrices("/home/an58/help_new.mtx")
 dense1 = s_mat.todense().tolist()
 mat = create_blocks_scalar(np.array(dense1,np.int64))
-betweenness_centrality(mat, 2)
+start = time.perf_counter()
+#s = ak.betwennessCentrality(0,mat)
+#print(s)
 end = time.perf_counter()
-print(f"triangle count took {end - start:0.9f} seconds")
+print(f"on chapel betwenness centrality took {end - start:0.9f} seconds")
+start = time.perf_counter()
+s = betweenness_centrality(mat,0)
+print(s)
+end = time.perf_counter()
+print(f"on client betwenness centrality took {end - start:0.9f} seconds")
 
 # start = time.perf_counter()
 # x = ak.randint(0, 5, 10)

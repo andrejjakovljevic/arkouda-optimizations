@@ -76,7 +76,10 @@ module OperatorMsg
                     }
                     when "/" { // truediv
                         var e = st.addEntry(rname, l.size, real);
-                        e.a = l.a:real / r.a:real;
+                        ref ea = e.a;
+                        ref la = l.a;
+                        ref ra = r.a;
+                        [(ei,li,ri) in zip(ea,la,ra)] ei = if ri != 0 then li: real/ri: real else 0;
                     } 
                     when "//" { // floordiv
                         var e = st.addEntry(rname, l.size, int);
@@ -172,7 +175,10 @@ module OperatorMsg
                     }
                     when "/" { // truediv
                         var e = st.addEntry(rname, l.size, real);
-                        e.a = l.a:real / r.a;
+                        ref ea = e.a;
+                        ref la = l.a;
+                        ref ra = r.a;
+                        [(ei,li,ri) in zip(ea,la,ra)] ei = if ri != 0 then li: real/ri: real else 0;
                     } 
                     when "//" { // floordiv
                         var e = st.addEntry(rname, l.size, real);
@@ -235,7 +241,10 @@ module OperatorMsg
                     }
                     when "/" { // truediv
                         var e = st.addEntry(rname, l.size, real);
-                        e.a = l.a / r.a:real;
+                        ref ea = e.a;
+                        ref la = l.a;
+                        ref ra = r.a;
+                        [(ei,li,ri) in zip(ea,la,ra)] ei = if ri != 0 then li: real/ri: real else 0;
                     } 
                     when "//" { // floordiv
                         var e = st.addEntry(rname, l.size, real);
@@ -298,7 +307,10 @@ module OperatorMsg
                     }
                     when "/" { // truediv
                         var e = st.addEntry(rname, l.size, real);
-                        e.a = l.a / r.a;
+                        ref ea = e.a;
+                        ref la = l.a;
+                        ref ra = r.a;
+                        [(ei,li,ri) in zip(ea,la,ra)] ei = if ri != 0 then li: real/ri: real else 0;
                     } 
                     when "//" { // floordiv
                         var e = st.addEntry(rname, l.size, real);
@@ -1751,24 +1763,39 @@ module OperatorMsg
             when (DType.Int64, DType.Int64) {
                 var l = toSymEntry(left,int);
                 var r = toSymEntry(right,int);
-                var s = toSymEntry(res,int);
-                s.hasMin = false;
-                s.hasMax = false;
                 select op
                 {
                     when "+" {
+                    var s = toSymEntry(res,int);
+                    s.hasMin = false;
+                    s.hasMax = false;
                         s.a = l.a + r.a;
                     }
                     when "-" {
+                        var s = toSymEntry(res,int);
+                        s.hasMin = false;
+                        s.hasMax = false;
                         s.a = l.a - r.a;
                     }
                     when "*" {
+                        var s = toSymEntry(res,int);
+                        s.hasMin = false;
+                        s.hasMax = false;
                         s.a = l.a * r.a;
                     }
                     when "/" {
-                        s.a = l.a / r.a;
+                        var s = toSymEntry(res, real);
+                        s.hasMin = false;
+                        s.hasMax = false;
+                        ref sa = s.a;
+                        ref la = l.a;
+                        ref ra = r.a;
+                        [(si,li,ri) in zip(sa,la,ra)] si = if ri != 0 then li: real/ri: real else 0;
                     }
                     when "//" {
+                        var s = toSymEntry(res,int);
+                        s.hasMin = false;
+                        s.hasMax = false;
                         ref sa = s.a;
                         ref la = l.a;
                         ref ra = r.a;
@@ -1799,7 +1826,10 @@ module OperatorMsg
                         s.a = l.a * r.a;
                     }
                     when "/" {
-                        s.a = l.a / r.a;
+                        ref sa = s.a;
+                        ref la = l.a;
+                        ref ra = r.a;
+                        [(si,li,ri) in zip(sa,la,ra)] si = if ri != 0 then li: real/ri: real else 0;
                     }
                     when "//" {
                         ref sa = s.a;
@@ -1832,7 +1862,10 @@ module OperatorMsg
                         s.a = l.a * r.a;
                     }
                     when "/" {
-                        s.a = l.a / r.a;
+                        ref sa = s.a;
+                        ref la = l.a;
+                        ref ra = r.a;
+                        [(si,li,ri) in zip(sa,la,ra)] si = if ri != 0 then li/ri else 0;
                     }
                     when "//" {
                         ref sa = s.a;
@@ -1865,7 +1898,10 @@ module OperatorMsg
                         s.a = l.a * r.a;
                     }
                     when "/" {
-                        s.a = l.a / r.a;
+                        ref sa = s.a;
+                        ref la = l.a;
+                        ref ra = r.a;
+                        [(si,li,ri) in zip(sa,la,ra)] si = if ri != 0 then li/ri else 0;
                     }
                     when "//" {
                         ref sa = s.a;

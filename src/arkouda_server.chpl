@@ -387,8 +387,12 @@ proc main() {
                 when "triangle_count"    {repTuple = triangleCountMsg(cmd, args, st);}
                 when "triangle_count_sparse" {repTuple = sparseTriangleCountMsg(cmd, args, st);}
                 when "vector_times_matrix" {repTuple = vectorTimesMatrixMsg(cmd, args, st);}
+                when "vector_times_matrix_store" {repTuple = vectorTimesMatrixStoreMsg(cmd, args, st);}
                 when "matrix_times_vector" {repTuple = matrixTimesVectorMsg(cmd, args, st);}
+                when "matrix_times_vector_store" {repTuple = matrixTimesVectorStoreMsg(cmd, args, st);}
                 when "inverse_vector"    {repTuple = inverseVectorMsg(cmd, args, st);}
+                when "inverse_vector_store" {repTuple = inverseVectorMsgStore(cmd, args, st);}
+                when "betwenness_centrality" {repTuple = betweennessCentralityMsg(cmd, args, st);}
                 when "connect" {
                     if authenticate {
                         repTuple = new MsgTuple("connected to arkouda server tcp://*:%i as user %s with token %s".format(

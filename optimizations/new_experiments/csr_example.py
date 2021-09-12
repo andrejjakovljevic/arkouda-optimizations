@@ -33,7 +33,7 @@ def get_matrices(filename):
     return (s_mat,s_mat_t)
 
 
-ak.connect(connect_url='tcp://bc12u11n3:5555')
+ak.connect(connect_url="tcp://nlogin2:5555")
 (s_mat, s_mat_t) = get_matrices("/home/an58/delaunay_n15.mtx")
 dat_real = s_mat.data.astype(np.int64)
 indexes = s_mat.indices.astype(np.int64)
@@ -53,14 +53,18 @@ for i in range(len(pointers)-1):
     right = pointers[i+1]
     if (pointers[i]<right):
         for j in range(pointers[i],right):
-            s+= ak.sortIntersect1d(find_splice(i, pointers, pd_indexes), find_splice(pd_indexes[j], pointers2, pd_indexes2)).size
+            #new version
+            #s+= ak.sortIntersect1d(find_splice(i, pointers, pd_indexes), find_splice(pd_indexes[j], pointers2, pd_indexes2)).size 
+            #old version
+            s+= ak.intersect1d(find_splice(i, pointers, pd_indexes), find_splice(pd_indexes[j], pointers2, pd_indexes2)).size
+
 
 print(s)
 end = time.perf_counter()
 print(f"first took {end - start:0.9f} seconds")
 start = time.perf_counter()
-s = ak.triangle_count_sparse(4096, pd_pointers, pd_indexes, pd_pointers2, pd_indexes2)
-print(s)
+#s = ak.triangle_count_sparse(4096, pd_pointers, pd_indexes, pd_pointers2, pd_indexes2)
+#print(s)
 end = time.perf_counter()
 print(f"second took {end - start:0.9f} seconds")
 ak.shutdown()

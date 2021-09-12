@@ -13,7 +13,7 @@ from arkouda.strings import Strings
 from arkouda.pdarraycreation import array, from_series
 
 __all__ = ["count_frequencies", "move_records", "cumsum", "remove_duplicates", "make_from_csv", "transpose", "triangle_count", "triangle_count_sparse",
-           "vector_times_matrix", "inverse", "matrix_times_vector"]
+           "vector_times_matrix", "inverse", "matrix_times_vector", "betwennessCentrality"]
 
 def count_frequencies(a: pdarray, b: pdarray, n: int, l: list) -> int:
     cmd = "count_frequencies"
@@ -107,13 +107,45 @@ def vector_times_matrix(n: int, pda1: pdarray, list_of_arrays: list):
         type1="float64"
     if (list_of_arrays[0].dtype==akfloat64):
         type2="float64"
-    args = str(n)+" "+type1+" "+type2+" "+pda1.name
+    check_type = akint64
+    if (type1=="float64" or type2=="float64"):
+        check_type=akfloat64
+    if (check_arr(check_type, pda1.size)):
+        return vector_times_matrix_store(n, pda1, list_of_arrays, check_type)
+    else:
+        args = str(n)+" "+type1+" "+type2+" "+pda1.name
+        for ar in list_of_arrays:
+            args+=" "+ar.name
+        cmd = "vector_times_matrix"
+        res_type = akint64
+        if (type1=="float64" or type2=="float64"):
+            res_type= akfloat64
+        arr = pdarray(cmd, args, res_type, pda1.size, pda1.ndim, pda1.shape, pda1.dtype.itemsize)
+        repMsg = generic_msg(cmd, args, create_pdarray=True, arr_id=arr.name, my_pdarray=[list_of_arrays+[pda1, arr]])
+        return arr
+
+def vector_times_matrix_store(n: int, pda1: pdarray, list_of_arrays: list, check_type):
+    name = uncache_array(check_type,pda1.size)
+    type1 = "int64"
+    type2 = "int64"
+    if (pda1.dtype==akfloat64):
+        type1="float64"
+    if (list_of_arrays[0].dtype==akfloat64):
+        type2="float64"
+    type3 = "int64"
+    if (check_type==akfloat64):
+        type3="float64"
+    cmd = "vector_times_matrix_store"
+    res_type = akint64
+    if (type1=="float64" or type2=="float64"):
+        res_type= akfloat64
+    arr = create_pdarray_with_name(name, cmd, "", res_type, pda1.size, pda1.ndim, pda1.shape, pda1.dtype.itemsize)
+    args = str(n)+" "+type1+" "+type2+" "+type3+" "+pda1.name+" "+arr.name
     for ar in list_of_arrays:
         args+=" "+ar.name
-    cmd = "vector_times_matrix"
-    arr = pdarray(cmd, args, pda1.dtype, pda1.size, pda1.ndim, pda1.shape, pda1.dtype.itemsize)
-    repMsg = generic_msg(cmd, args, create_pdarray=True,arr_id=arr.name, my_pdarray=[list_of_arrays+[pda1, arr]])
-    return arr
+    arr.cmd_args = args
+    repMsg = generic_msg(cmd, args, create_pdarray=True, arr_id=arr.name, my_pdarray=[list_of_arrays+[pda1, arr]])
+    return arr    
 
 def matrix_times_vector(n: int, pda1: pdarray, list_of_arrays: list):
     type1 = "int64"
@@ -125,20 +157,69 @@ def matrix_times_vector(n: int, pda1: pdarray, list_of_arrays: list):
     check_type = akint64
     if (type1=="float64" or type2=="float64"):
         check_type=akfloat64
-    if (check_arr(check_type)):
-        return matrix_times_vector_store(n, pda1, list_of_arrays)
+    if (check_arr(check_type, pda1.size)):
+        return matrix_times_vector_store(n, pda1, list_of_arrays, check_type)
     else:
         args = str(n)+" "+type1+" "+type2+" "+pda1.name
         for ar in list_of_arrays:
             args+=" "+ar.name
         cmd = "matrix_times_vector"
-        arr = pdarray(cmd, args, pda1.dtype, pda1.size, pda1.ndim, pda1.shape, pda1.dtype.itemsize)
+        res_type = np.int64
+        if (type1=="float64" or type2=="float64"):
+            res_type=np.float64
+        arr = pdarray(cmd, args, res_type, pda1.size, pda1.ndim, pda1.shape, pda1.dtype.itemsize)
         repMsg = generic_msg(cmd, args, create_pdarray=True, arr_id=arr.name, my_pdarray=[list_of_arrays+[pda1, arr]])
         return arr
 
-def inverse(pda1: pdarray):
-    args = pda1.name
-    cmd="inverse_vector"
-    arr = pdarray(cmd, args, pda1.dtype, pda1.size, pda1.ndim, pda1.shape, pda1.dtype.itemsize)
-    repMsg = generic_msg(cmd, args, create_pdarray=True,arr_id=arr.name, my_pdarray=[pda1, arr])
+def matrix_times_vector_store(n: int, pda1: pdarray, list_of_arrays: list, check_type):
+    name = uncache_array(check_type, pda1.size)
+    type1 = "int64"
+    type2 = "int64"
+    if (pda1.dtype==akfloat64):
+        type1="float64"
+    if (list_of_arrays[0].dtype==akfloat64):
+        type2="float64"
+    type3 = "int64"
+    if (check_type==akfloat64):
+        type3="float64"
+    cmd = "matrix_times_vector_store"
+    res_type = akint64
+    if (type1=="float64" or type2=="float64"):
+        res_type=akfloat64
+    arr = create_pdarray_with_name(name, cmd, "", res_type, pda1.size, pda1.ndim, pda1.shape, pda1.dtype.itemsize)
+    args = str(n)+" "+type1+" "+type2+" "+type3+" "+pda1.name+" "+arr.name
+    for ar in list_of_arrays:
+        args+=" "+ar.name
+    arr.cmd_args = args
+    repMsg = generic_msg(cmd, args, create_pdarray=True, arr_id=arr.name, my_pdarray=[list_of_arrays+[pda1, arr]])
     return arr
+
+
+def inverse(pda1: pdarray):
+    mytype = "int64"
+    if (pda1.dtype==akfloat64):
+        mytype= "float64"
+    args = mytype+" "+pda1.name
+    if (check_arr(pda1.dtype, pda1.size)):
+        cmd = "inverse_vector_store"
+        name =uncache_array(pda1.dtype, pda1.size)
+        arr = create_pdarray_with_name(name, cmd, "", pda1.dtype, pda1.size, pda1.ndim, pda1.shape, pda1.dtype.itemsize)
+        args += " "+arr.name
+        generic_msg(cmd, args, arr_id=arr.name, my_pdarray=[pda1, arr])
+        return arr
+    else:
+        cmd="inverse_vector"
+        arr = pdarray(cmd, args, pda1.dtype, pda1.size, pda1.ndim, pda1.shape, pda1.dtype.itemsize)
+        repMsg = generic_msg(cmd, args, create_pdarray=True,arr_id=arr.name, my_pdarray=[pda1, arr])
+        return arr
+
+def betwennessCentrality(source: int, list_of_arrays: list):
+    args = str(len(list_of_arrays))+" "+str(source)
+    for k in list_of_arrays:
+        args+=" "+k.name
+    cmd = "betwenness_centrality"
+    pda1 = list_of_arrays[0]
+    arr = pdarray(cmd, args, akfloat64, pda1.size, pda1.ndim, pda1.shape, akfloat64.itemsize)
+    generic_msg(cmd, args, create_pdarray=True, arr_id=arr.name, my_pdarray=[list_of_arrays+[arr]])
+    return arr
+

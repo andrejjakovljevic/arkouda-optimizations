@@ -46,7 +46,7 @@ def triangle_count_on_chapel(A: list) -> int:
     return ak.triangle_count(A)
 
 x = np.random.randint(2, size=(2, 2))
-ak.connect(connect_url='tcp://bc12u11n3:5555')
+ak.connect(connect_url='tcp://nlogin2:5555')
 out = create_blocks_scalar(x)
 (s_mat, s_mat_t) = get_matrices("/home/an58/help.mtx")
 dense1 = s_mat.todense().tolist()

@@ -39,7 +39,7 @@ clientLogger = getArkoudaLogger(name='Arkouda User Logger', logFormat='%(message
 print('{}'.format(pyfiglet.figlet_format('Arkouda')))
 print('Client Version: {}'.format(__version__)) # type: ignore
 
-queue_size: int = 2
+queue_size: int = 1
 
 q = Queue(queue_size)
 client_to_server_names = {}
@@ -770,7 +770,9 @@ class BufferItem:
             if (names_to_number_of_live_references[info[0]]==0):
                 # See if we can reuse some temporaries right now
                 if (self.cmd=="binopvv" or self.cmd=="binopvs" or self.cmd=="binopsv" or self.cmd=="arange" or self.cmd == "randint"):
-                    if (info[1]==names_to_weakref[self.pdarray_id]().dtype and int(info[2])==names_to_weakref[self.pdarray_id]().size):
+                    #print("aaa")
+                    if (info[1]==names_to_weakref[self.pdarray_id]().dtype and int(info[2])==names_to_weakref[self.pdarray_id]().size
+                    and (info[0].split(' ')[0]!="/" or names_to_weakref[self.pdarray_id]().dtype==akint64)):
                         self.cmd+='Store'
                         self.args+=" "+info[0]
                         self.create_pdarray=False
@@ -935,6 +937,7 @@ def cache_array(arrName: str, arrType, arrSize):
     """
         Cache the array to be reused (called with the destructor)
     """
+    #print("cache", client_to_server_names[arrName])
     if (sys.meta_path is None):
         return
     if arrName not in client_to_server_names.keys():
