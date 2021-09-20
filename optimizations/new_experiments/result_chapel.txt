@@ -1,0 +1,11 @@
+delaunay_n10
+0.420956601
+delaunay_n11
+0.936429551
+delaunay_n12
+1.857089986
+delaunay_n13
+3.627577455
+delaunay_n14
+7.470205236
+

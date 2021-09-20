@@ -13,6 +13,7 @@ module MultiTypeSymbolTable
     
     private config const logLevel = ServerConfig.logLevel;
     const mtLogger = new Logger(logLevel);
+    var nid = 0;
 
     /* symbol table */
     class SymTab
@@ -27,7 +28,6 @@ module MultiTypeSymbolTable
         */
         var tab: map(string, shared GenSymEntry);
 
-        var nid = 0;
         /*
         Gives out symbol names.
         */

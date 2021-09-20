@@ -136,18 +136,32 @@ module MsgProcessing
         var dtype = str2dtype(dtypestr);
         var size = try! sizestr:int;
         var res: borrowed GenSymEntry = st.lookup(store);
-        var s = toSymEntry(res,int);
-        s.a = 0;
-        s.hasMin = false;
-        s.hasMax = false;
-        // if verbose print action
-        mpLogger.debug(getModuleName(),getRoutineName(),getLineNumber(),
-            "cmd: %s dtype: %s size: %i updated pdarray name: %s".format(
-                                                     cmd,dtype2str(dtype),size,store));
-        // if verbose print result
-        mpLogger.debug(getModuleName(),getRoutineName(),getLineNumber(),
-                                    "created the pdarray %s".format(st.attrib(store)));
-
+        if (dtypestr=="int64") then {
+            var s = toSymEntry(res,int);
+            s.a = 0;
+            s.hasMin = false;
+            s.hasMax = false;
+            // if verbose print action
+            mpLogger.debug(getModuleName(),getRoutineName(),getLineNumber(),
+                "cmd: %s dtype: %s size: %i updated pdarray name: %s".format(
+                                                        cmd,dtype2str(dtype),size,store));
+            // if verbose print result
+            mpLogger.debug(getModuleName(),getRoutineName(),getLineNumber(),
+                                        "created the pdarray %s".format(st.attrib(store)));
+        }
+        else if (dtypestr=="float64") then {
+            var s = toSymEntry(res,real);
+            s.a = 0;
+            s.hasMin = false;
+            s.hasMax = false;
+            // if verbose print action
+            mpLogger.debug(getModuleName(),getRoutineName(),getLineNumber(),
+                "cmd: %s dtype: %s size: %i updated pdarray name: %s".format(
+                                                        cmd,dtype2str(dtype),size,store));
+            // if verbose print result
+            mpLogger.debug(getModuleName(),getRoutineName(),getLineNumber(),
+                                        "created the pdarray %s".format(st.attrib(store)));
+        }
         repMsg = "created " + st.attrib(store);
         mpLogger.debug(getModuleName(),getRoutineName(),getLineNumber(), repMsg);
         return new MsgTuple(repMsg, MsgType.NORMAL);

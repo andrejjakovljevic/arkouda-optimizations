@@ -202,6 +202,15 @@ proc main() {
     }
     
     /*
+     * Create a writer channel with a starting offset at the end of the file 
+     */
+    proc file.openAppender() {
+        var writer = this.writer(start=this.size);
+        return writer;
+    }
+
+
+    /*
     Sets the shutdownServer boolean to true and sends the shutdown command to socket,
     which stops the arkouda_server listener thread and closes socket.
     */
@@ -268,7 +277,7 @@ proc main() {
               try {
                 if (cmd != "array" && cmd != "get_from_csv") {
                   asLogger.info(getModuleName(), getRoutineName(), getLineNumber(),
-                                                     ">>> %t".format(cmd));
+                                                     ">>> %t %s".format(cmd, args));
                 } else {
                   asLogger.info(getModuleName(), getRoutineName(), getLineNumber(),
                                                      ">>> %s [binary data]".format(cmd));
@@ -282,6 +291,15 @@ proc main() {
             if cmd == "shutdown" {
                 shutdown(user=user);
                 if (trace) {
+                    var fout = open("max_live.dat", iomode.rw);
+
+                    // Position a writing channel at the end of the file
+                    var cout = fout.openAppender();
+
+                    cout.writeln(nid);
+
+                    cout.close();
+                    fout.close();
                     asLogger.info(getModuleName(),getRoutineName(),getLineNumber(),
                                          "<<< shutdown initiated by %s took %.17r sec, time spent creating stuff %.17r ms, max live %i".format(user, 
                                                    t1.elapsed() - s0, watch.elapsed(TimeUnits.milliseconds), maxi));

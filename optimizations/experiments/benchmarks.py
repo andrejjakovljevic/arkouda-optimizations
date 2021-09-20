@@ -4,6 +4,7 @@ import numpy as np
 import time
 import random
 from scipy.sparse import csr_matrix
+import sys
 
 def triangle_count_numpy(L:np.ndarray, nblocks_m, nblocks_n, nblocks_l, verbose):
     """
@@ -222,20 +223,31 @@ def get_matrices(filename):
     fs = []
     ss = []
     datas = []
+    i=0
+    shapes = -1
     for x in f:
+        if (x[0]=='%'):
+            continue
+        if (i==0):
+            spl = x.split(' ')
+            shape_size = int(spl[0])
         if (x=="\n"):
             continue
-        spl = x.split(' ')
-        f = int(spl[0])
-        s = int(spl[1])
-        data = float(spl[2])
-        fs.append(f)
-        ss.append(s)
-        datas.append(data)
-    s_mat = csr_matrix((datas,(fs, ss)), shape=(4, 4))
-    s_mat_t = s_mat.transpose(axes = None, copy=True)
-    return (s_mat,s_mat_t)
-
+        if (i>0):
+            spl = x.split(' ')
+            f = int(spl[0])
+            s = int(spl[1])
+            data = 1
+            fs.append(f)
+            ss.append(s)
+            fs.append(s)
+            ss.append(f)
+            datas.append(data)
+            datas.append(data)
+        i+=1
+    s_mat = csr_matrix((datas,(fs, ss)), shape=(6, 6))
+    #s_mat_t = s_mat.transpose(axes = None, copy=True)
+    return (s_mat)
 def create_blocks_scalar(A: np.ndarray):
     out = []
     for k in A:
@@ -295,15 +307,16 @@ x = np.array([[0, 0, 0, 0],
 # print(triangle_count_numpy(x, 2, 2, 2, False))
 
 
-ak.connect(connect_url='tcp://nlogin2:5555')
+ak.connect(connect_url='tcp://bc9u23n1:5555')
 # x = ak.randint(0, 10, 100)
 # y = ak.randint(0, 10, 100)
 # z = x + y
 # print(ak.sum(z))
 # y = ak.randint(0, 10, 100)
 # print(y.client_name)
-(s_mat, s_mat_t) = get_matrices("/home/an58/help_new.mtx")
+(s_mat) = get_matrices("/home/an58/"+sys.argv[1]+".mtx")
 dense1 = s_mat.todense().tolist()
+#print(s_mat)
 mat = create_blocks_scalar(np.array(dense1,np.int64))
 start = time.perf_counter()
 #s = ak.betwennessCentrality(0,mat)
@@ -311,8 +324,9 @@ start = time.perf_counter()
 end = time.perf_counter()
 print(f"on chapel betwenness centrality took {end - start:0.9f} seconds")
 start = time.perf_counter()
-s = betweenness_centrality(mat,0)
+s = ak.sum(betweenness_centrality(mat,0))
 print(s)
+#s = betweenness_centrality_1d()
 end = time.perf_counter()
 print(f"on client betwenness centrality took {end - start:0.9f} seconds")
 

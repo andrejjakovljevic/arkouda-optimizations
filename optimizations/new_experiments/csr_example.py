@@ -2,6 +2,7 @@ import arkouda as ak
 from scipy.sparse import csr_matrix, csc_matrix
 import numpy as np
 import time
+import sys
 
 def find_splice(k, pointers, indexes):
     left = pointers[k]
@@ -14,27 +15,35 @@ def get_matrices(filename):
     ss = []
     datas = []
     i=0
+    shapes = -1
     for x in f:
+        if (x[0]=='%'):
+            continue
+        if (i==0):
+            spl = x.split(' ')
+            shape_size = int(spl[0])
         if (x=="\n"):
             continue
-        spl = x.split(' ')
-        f = int(spl[0])-1
-        s = int(spl[1])-1
-        data = 1
-        if (s>f):
-            (f, s) = (s, f)
-        fs.append(f)
-        ss.append(s)
-        datas.append(data)
-        #print("i=",i)
-        #i+=1
-    s_mat = csr_matrix((datas,(fs, ss)), shape=(32768, 32768))
+        if (i>0):
+            spl = x.split(' ')
+            f = int(spl[0])-1
+            s = int(spl[1])-1
+            data = 1
+            if (s>f):
+                (f, s) = (s, f)
+            fs.append(f)
+            ss.append(s)
+            datas.append(data)
+            #print("i=",i)
+        i+=1
+    s_mat = csr_matrix((datas,(fs, ss)), shape=(shape_size, shape_size))
     s_mat_t = csc_matrix(s_mat)
     return (s_mat,s_mat_t)
 
-
-ak.connect(connect_url="tcp://nlogin2:5555")
-(s_mat, s_mat_t) = get_matrices("/home/an58/delaunay_n15.mtx")
+#open and read the file after the appending:
+f = open("result.txt", "a")
+ak.connect(connect_url="tcp://bc9u23n1:5555")
+(s_mat, s_mat_t) = get_matrices("/home/an58/"+sys.argv[1]+".mtx")
 dat_real = s_mat.data.astype(np.int64)
 indexes = s_mat.indices.astype(np.int64)
 pointers = s_mat.indptr.astype(np.int64)
@@ -54,17 +63,17 @@ for i in range(len(pointers)-1):
     if (pointers[i]<right):
         for j in range(pointers[i],right):
             #new version
-            #s+= ak.sortIntersect1d(find_splice(i, pointers, pd_indexes), find_splice(pd_indexes[j], pointers2, pd_indexes2)).size 
+            s+= ak.sortIntersect1d(find_splice(i, pointers, pd_indexes), find_splice(pd_indexes[j], pointers2, pd_indexes2)).size 
             #old version
-            s+= ak.intersect1d(find_splice(i, pointers, pd_indexes), find_splice(pd_indexes[j], pointers2, pd_indexes2)).size
+            #s+= ak.intersect1d(find_splice(i, pointers, pd_indexes), find_splice(pd_indexes[j], pointers2, pd_indexes2)).size
 
 
+#print(s)
+s = ak.triangle_count_sparse(4096, pd_pointers, pd_indexes, pd_pointers2, pd_indexes2)
 print(s)
 end = time.perf_counter()
-print(f"first took {end - start:0.9f} seconds")
-start = time.perf_counter()
-#s = ak.triangle_count_sparse(4096, pd_pointers, pd_indexes, pd_pointers2, pd_indexes2)
-#print(s)
-end = time.perf_counter()
+exec_time = end - start
+f.write(sys.argv[1]+"\n")
+f.write(f"{exec_time:0.9f}\n")
 print(f"second took {end - start:0.9f} seconds")
 ak.shutdown()

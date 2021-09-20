@@ -6,7 +6,7 @@ from typing import cast, List, Sequence
 from typeguard import typechecked
 import json, struct
 import numpy as np  # type: ignore
-from arkouda.client import generic_msg, client_to_server_names, id_to_args, args_to_id, find_last, delete_from_args_map, cache_array, cache, names_to_weakref
+from arkouda.client import generic_msg, client_to_server_names, id_to_args, args_to_id, find_last, delete_from_args_map, cache_array, cache, names_to_weakref, check_arr, uncache_array
 from arkouda.dtypes import dtype, DTypes, resolve_scalar_dtype, \
     structDtypeCodes, translate_np_dtype, NUMBER_FORMAT_STRINGS, \
     int_scalars, numeric_scalars, numpy_scalars, int64
@@ -2073,8 +2073,11 @@ def unregister_pdarray_by_name(user_defined_name:str) -> None:
 
 def binOpWithStore(pda_left: pdarray, pda_right: pdarray, pda_store_name: str, binop: str) -> pdarray:
     if isinstance(pda_right, pdarray) and isinstance(pda_left, pdarray):
+        dt = "int64"
+        if (pda_left.dtype==akfloat64 or pda_right.dtype==akfloat64):
+            dt= "float64"
         cmd = "binopvvStore"
-        arr = create_pdarray_with_name(pda_store_name, cmd, "", (akfloat64 if binop=="/" else pda_left.dtype), pda_left.size, pda_left.ndim,
+        arr = create_pdarray_with_name(pda_store_name, cmd, "", (akfloat64 if (dt=="float64" or binop=="/") else pda_left.dtype), pda_left.size, pda_left.ndim,
                                        pda_left.shape, pda_left.itemsize)
         args = "{} {} {} {}". \
             format(binop, pda_left.name, pda_right.name, arr.name)
@@ -2158,19 +2161,6 @@ def multAndStore(pda_left: pdarray, pda_right: pdarray, pda_store_name: str) -> 
 class RegistrationError(Exception):
     """Error/Exception used when the Arkouda Server cannot register an object"""
 
-
-def check_arr(dtype, arr_size):
-    # Make sure cache[dtype][arr_size] is not empty
-    #print("checking", dtype, arr_size)
-    return dtype in cache and arr_size in cache[dtype] and cache[dtype][arr_size]
-
-
-def uncache_array(dtype, arr_size):
-    if check_arr(dtype, arr_size):
-        arr = cache[dtype][arr_size].pop()
-        # print("Uncaching ", arr, arr_size)
-        # print("New cache length ", len(cache[dtype][arr_size]))
-        return arr
 
 @typechecked
 def create_pdarray_with_name(name: str, cmd: str, cmd_args: str,

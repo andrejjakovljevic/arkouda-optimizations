@@ -39,7 +39,7 @@ clientLogger = getArkoudaLogger(name='Arkouda User Logger', logFormat='%(message
 print('{}'.format(pyfiglet.figlet_format('Arkouda')))
 print('Client Version: {}'.format(__version__)) # type: ignore
 
-queue_size: int = 1
+queue_size: int = 2
 
 q = Queue(queue_size)
 client_to_server_names = {}
@@ -774,6 +774,7 @@ class BufferItem:
                     if (info[1]==names_to_weakref[self.pdarray_id]().dtype and int(info[2])==names_to_weakref[self.pdarray_id]().size
                     and (info[0].split(' ')[0]!="/" or names_to_weakref[self.pdarray_id]().dtype==akint64)):
                         self.cmd+='Store'
+                        #print("new=",self.cmd)
                         self.args+=" "+info[0]
                         self.create_pdarray=False
                         names_to_weakref[self.pdarray_id]().cmd = self.cmd
@@ -781,6 +782,15 @@ class BufferItem:
                         client_to_server_names[self.pdarray_id]=client_to_server_names[info[0]]
                         used = info[0]
                         break
+                    elif (check_arr(info[1], info[2])):
+                        name = uncache_array(info[1], info[2])
+                        self.cmd+='Store'
+                        self.args+=" "+info[0]
+                        self.create_pdarray=False
+                        names_to_weakref[self.pdarray_id]().cmd = self.cmd
+                        names_to_weakref[self.pdarray_id]().cmd_args=self.args
+                        client_to_server_names[self.pdarray_id]=client_to_server_names[name]
+                        used = name
 
         retMsg = generic_msg(self.cmd, self.args, self.send_bytes, self.recv_bytes,
                     return_value_needed=True, create_pdarray=self.create_pdarray,
@@ -933,14 +943,26 @@ def delete_from_args_map(arrName: str):
     return True
     
 
+def check_arr(dtype, arr_size):
+    # Make sure cache[dtype][arr_size] is not empty
+    #print("checking", dtype, arr_size)
+    return dtype in cache and arr_size in cache[dtype] and cache[dtype][arr_size]
+
 def cache_array(arrName: str, arrType, arrSize):
     """
         Cache the array to be reused (called with the destructor)
     """
-    #print("cache", client_to_server_names[arrName])
+    #print("cache", client_to_server_names[arrName], arrType)
     if (sys.meta_path is None):
         return
     if arrName not in client_to_server_names.keys():
         return
     cache[arrType][arrSize].add(client_to_server_names[arrName])
     client_to_server_names.pop(arrName)
+
+def uncache_array(dtype, arr_size):
+    if check_arr(dtype, arr_size):
+        arr = cache[dtype][arr_size].pop()
+        # print("Uncaching ", arr, arr_size)
+        # print("New cache length ", len(cache[dtype][arr_size]))
+        return arr

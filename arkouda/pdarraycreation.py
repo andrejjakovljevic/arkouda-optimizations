@@ -369,13 +369,12 @@ def ones(size: int_scalars, dtype: type = float64) -> pdarray:
     if check_arr(dtype, size):
         cmd = "zerosStore"
         name = uncache_array(dtype, size)
-
         arr = create_pdarray_with_name(name, cmd, "", dtype, size, 1,
                                        [size], dtype.itemsize)
 
         args='{} {} {}'. \
                 format(cast(np.dtype, dtype).name, size, arr.name)
-
+        #print("args=",args)
         arr.cmd_args = args
 
         generic_msg(cmd=cmd, args=args, arr_id=arr.name, my_pdarray=[arr])
