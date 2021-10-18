@@ -1,0 +1,206 @@
+    _         _                   _       
+   / \   _ __| | _____  _   _  __| | __ _ 
+  / _ \ | '__| |/ / _ \| | | |/ _` |/ _` |
+ / ___ \| |  |   < (_) | |_| | (_| | (_| |
+/_/   \_\_|  |_|\_\___/ \__,_|\__,_|\__,_|
+                                          
+
+Client Version: 0+untagged.2427.g476a92c.dirty
+         3251 function calls (3198 primitive calls) in 0.234 seconds
+
+   Ordered by: standard name
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+        1    0.000    0.000    0.234    0.234 <string>:1(<module>)
+        7    0.000    0.000    0.000    0.000 <string>:1(__init__)
+        7    0.000    0.000    0.000    0.000 <string>:1(__repr__)
+       14    0.000    0.000    0.001    0.000 __init__.py:100(__init__)
+       12    0.000    0.000    0.000    0.000 __init__.py:117(getLevelName)
+       12    0.000    0.000    0.001    0.000 __init__.py:1361(debug)
+       12    0.000    0.000    0.000    0.000 __init__.py:1451(findCaller)
+       12    0.000    0.000    0.000    0.000 __init__.py:1481(makeRecord)
+       12    0.000    0.000    0.001    0.000 __init__.py:1496(_log)
+       12    0.000    0.000    0.000    0.000 __init__.py:1521(handle)
+       12    0.000    0.000    0.000    0.000 __init__.py:154(<lambda>)
+       12    0.000    0.000    0.000    0.000 __init__.py:1575(callHandlers)
+       12    0.000    0.000    0.000    0.000 __init__.py:1619(isEnabledFor)
+       36    0.000    0.000    0.000    0.000 __init__.py:174(resolve_forwardref)
+        7    0.000    0.000    0.000    0.000 __init__.py:183(dumps)
+       14    0.000    0.000    0.000    0.000 __init__.py:236(function_name)
+       12    0.000    0.000    0.000    0.000 __init__.py:293(__init__)
+        7    0.000    0.000    0.000    0.000 __init__.py:299(loads)
+        5    0.000    0.000    0.000    0.000 __init__.py:432(check_union)
+        9    0.000    0.000    0.000    0.000 __init__.py:535(check_number)
+    36/31    0.000    0.000    0.000    0.000 __init__.py:601(check_type)
+       14    0.000    0.000    0.000    0.000 __init__.py:685(check_return_type)
+       14    0.000    0.000    0.000    0.000 __init__.py:718(check_argument_types)
+       12    0.000    0.000    0.000    0.000 __init__.py:747(filter)
+     14/6    0.000    0.000    0.232    0.039 __init__.py:888(wrapper)
+       14    0.000    0.000    0.000    0.000 __init__.py:91(__init__)
+        7    0.000    0.000    0.231    0.033 client.py:330(_send_string_message)
+     14/7    0.000    0.000    0.232    0.033 client.py:533(generic_msg)
+        2    0.000    0.000    0.000    0.000 client.py:625(<listcomp>)
+       14    0.000    0.000    0.000    0.000 client.py:740(__init__)
+        7    0.000    0.000    0.231    0.033 client.py:759(execute)
+        7    0.000    0.000    0.015    0.002 client.py:803(buff_push)
+       18    0.000    0.000    0.000    0.000 client.py:813(is_temporary)
+        7    0.000    0.000    0.000    0.000 client.py:819(make_dependencies)
+        5    0.000    0.000    0.000    0.000 client.py:843(remove_from_queue)
+        7    0.000    0.000    0.000    0.000 client.py:853(transform_args)
+        5    0.000    0.000    0.217    0.043 client.py:869(execute_with_dependencies)
+        2    0.000    0.000    0.015    0.007 client.py:885(buff_empty_partial)
+        3    0.000    0.000    0.000    0.000 client.py:889(find_last)
+        3    0.000    0.000    0.000    0.000 client.py:904(delete_from_args_map)
+        2    0.000    0.000    0.000    0.000 client.py:946(check_arr)
+        2    0.000    0.000    0.000    0.000 client.py:951(cache_array)
+        7    0.000    0.000    0.000    0.000 dataclasses.py:350(wrapper)
+        7    0.000    0.000    0.000    0.000 decoder.py:332(decode)
+        7    0.000    0.000    0.000    0.000 decoder.py:343(raw_decode)
+        4    0.000    0.000    0.000    0.000 dtypes.py:140(resolve_scalar_dtype)
+        7    0.000    0.000    0.000    0.000 encoder.py:182(encode)
+        7    0.000    0.000    0.000    0.000 encoder.py:204(iterencode)
+       24    0.000    0.000    0.000    0.000 enum.py:284(__call__)
+       24    0.000    0.000    0.000    0.000 enum.py:526(__new__)
+       14    0.000    0.000    0.000    0.000 enum.py:628(value)
+       12    0.000    0.000    0.000    0.000 genericpath.py:117(_splitext)
+       42    0.000    0.000    0.000    0.000 inspect.py:158(isfunction)
+       14    0.000    0.000    0.000    0.000 inspect.py:171(isgeneratorfunction)
+       14    0.000    0.000    0.000    0.000 inspect.py:196(isasyncgen)
+       14    0.000    0.000    0.000    0.000 inspect.py:200(isgenerator)
+       14    0.000    0.000    0.000    0.000 inspect.py:2117(_signature_from_function)
+       14    0.000    0.000    0.001    0.000 inspect.py:2198(_signature_from_callable)
+       17    0.000    0.000    0.000    0.000 inspect.py:2467(__init__)
+       51    0.000    0.000    0.000    0.000 inspect.py:2517(name)
+       10    0.000    0.000    0.000    0.000 inspect.py:2521(default)
+       63    0.000    0.000    0.000    0.000 inspect.py:2529(kind)
+       14    0.000    0.000    0.000    0.000 inspect.py:2609(__init__)
+       14    0.000    0.000    0.000    0.000 inspect.py:2750(__init__)
+       31    0.000    0.000    0.000    0.000 inspect.py:2799(<genexpr>)
+       14    0.000    0.000    0.001    0.000 inspect.py:2829(from_callable)
+       21    0.000    0.000    0.000    0.000 inspect.py:2835(parameters)
+       14    0.000    0.000    0.000    0.000 inspect.py:2879(_bind)
+       14    0.000    0.000    0.000    0.000 inspect.py:3010(bind)
+       14    0.000    0.000    0.001    0.000 inspect.py:3081(signature)
+       14    0.000    0.000    0.000    0.000 inspect.py:484(unwrap)
+       14    0.000    0.000    0.000    0.000 inspect.py:504(_is_wrapper)
+       31    0.000    0.000    0.000    0.000 inspect.py:72(isclass)
+        7    0.000    0.000    0.000    0.000 message.py:131(fromdict)
+        7    0.000    0.000    0.000    0.000 message.py:14(__str__)
+        7    0.000    0.000    0.000    0.000 message.py:21(__repr__)
+        7    0.000    0.000    0.000    0.000 message.py:66(__init__)
+        7    0.000    0.000    0.000    0.000 message.py:97(asdict)
+        1    0.000    0.000    0.207    0.207 numeric.py:411(histogram)
+        3    0.000    0.000    0.000    0.000 pdarrayclass.py:123(__init__)
+        3    0.000    0.000    0.014    0.005 pdarrayclass.py:1482(sum)
+        2    0.000    0.000    0.003    0.001 pdarrayclass.py:1538(min)
+        2    0.000    0.000    0.003    0.001 pdarrayclass.py:1565(max)
+        2    0.000    0.000    0.003    0.001 pdarrayclass.py:1645(mean)
+        3    0.000    0.000    0.000    0.000 pdarrayclass.py:165(__del__)
+        1    0.000    0.000    0.018    0.018 pdarrayclass.py:1670(var)
+        1    0.000    0.000    0.018    0.018 pdarrayclass.py:1722(std)
+        2    0.000    0.000    0.006    0.003 pdarrayclass.py:224(_binop)
+        4    0.000    0.000    0.000    0.000 pdarrayclass.py:34(parse_single_value)
+        1    0.000    0.000    0.000    0.000 pdarrayclass.py:365(__sub__)
+        1    0.000    0.000    0.006    0.006 pdarrayclass.py:489(__pow__)
+        3    0.000    0.000    0.014    0.005 pdarrayclass.py:812(sum)
+        2    0.000    0.000    0.003    0.001 pdarrayclass.py:825(min)
+        2    0.000    0.000    0.003    0.001 pdarrayclass.py:831(max)
+        1    0.000    0.000    0.003    0.003 pdarrayclass.py:849(mean)
+        1    0.000    0.000    0.018    0.018 pdarrayclass.py:881(std)
+       12    0.000    0.000    0.000    0.000 posixpath.py:121(splitext)
+       12    0.000    0.000    0.000    0.000 posixpath.py:144(basename)
+       12    0.000    0.000    0.000    0.000 posixpath.py:41(_get_sep)
+       12    0.000    0.000    0.000    0.000 posixpath.py:52(normcase)
+        7    0.000    0.000    0.000    0.000 queue.py:110(full)
+        7    0.000    0.000    0.000    0.000 queue.py:121(put)
+        7    0.000    0.000    0.000    0.000 queue.py:153(get)
+        5    0.000    0.000    0.000    0.000 queue.py:205(_init)
+       43    0.000    0.000    0.000    0.000 queue.py:208(_qsize)
+        7    0.000    0.000    0.000    0.000 queue.py:212(_put)
+        7    0.000    0.000    0.000    0.000 queue.py:216(_get)
+        5    0.000    0.000    0.000    0.000 queue.py:33(__init__)
+        2    0.000    0.000    0.000    0.000 queue.py:91(qsize)
+       20    0.000    0.000    0.000    0.000 queue.py:96(empty)
+        7    0.000    0.000    0.000    0.000 socket.py:438(send)
+        7    0.000    0.000    0.000    0.000 socket.py:591(_deserialize)
+        7    0.000    0.000    0.000    0.000 socket.py:659(send_string)
+        7    0.229    0.033    0.229    0.033 socket.py:680(recv_string)
+        7    0.000    0.000    0.000    0.000 socket.py:701(<lambda>)
+        1    0.000    0.000    0.234    0.234 taxi_example.py:40(profile_function)
+       12    0.000    0.000    0.000    0.000 threading.py:1052(name)
+       12    0.000    0.000    0.000    0.000 threading.py:1214(current_thread)
+       15    0.000    0.000    0.000    0.000 threading.py:216(__init__)
+       14    0.000    0.000    0.000    0.000 threading.py:240(__enter__)
+       14    0.000    0.000    0.000    0.000 threading.py:243(__exit__)
+       14    0.000    0.000    0.000    0.000 threading.py:255(_is_owned)
+       14    0.000    0.000    0.000    0.000 threading.py:335(notify)
+       14    0.000    0.000    0.000    0.000 types.py:164(__get__)
+       14    0.000    0.000    0.000    0.000 typing.py:110(_type_check)
+    19/17    0.000    0.000    0.000    0.000 typing.py:255(_eval_type)
+        3    0.000    0.000    0.000    0.000 typing.py:262(<genexpr>)
+        9    0.000    0.000    0.000    0.000 typing.py:314(__eq__)
+        5    0.000    0.000    0.000    0.000 typing.py:319(__hash__)
+       14    0.000    0.000    0.000    0.000 typing.py:442(__init__)
+       14    0.000    0.000    0.000    0.000 typing.py:455(_evaluate)
+        5    0.000    0.000    0.000    0.000 typing.py:587(_is_dunder)
+        6    0.000    0.000    0.000    0.000 typing.py:652(__eq__)
+        5    0.000    0.000    0.000    0.000 typing.py:694(__getattr__)
+       31    0.000    0.000    0.000    0.000 typing.py:710(__subclasscheck__)
+       36    0.000    0.000    0.000    0.000 typing.py:890(cast)
+        7    0.000    0.000    0.000    0.000 typing.py:901(_get_defaults)
+        7    0.000    0.000    0.000    0.000 typing.py:926(get_type_hints)
+        7    0.000    0.000    0.000    0.000 weakref.py:408(__setitem__)
+       14    0.000    0.000    0.000    0.000 weakref.py:432(get)
+        5    0.000    0.000    0.000    0.000 {built-in method _thread.allocate_lock}
+       31    0.000    0.000    0.000    0.000 {built-in method _thread.get_ident}
+       17    0.000    0.000    0.000    0.000 {built-in method builtins.callable}
+       14    0.000    0.000    0.000    0.000 {built-in method builtins.compile}
+       14    0.000    0.000    0.000    0.000 {built-in method builtins.eval}
+        1    0.000    0.000    0.234    0.234 {built-in method builtins.exec}
+      115    0.000    0.000    0.000    0.000 {built-in method builtins.getattr}
+       49    0.000    0.000    0.000    0.000 {built-in method builtins.hasattr}
+        5    0.000    0.000    0.000    0.000 {built-in method builtins.hash}
+       21    0.000    0.000    0.000    0.000 {built-in method builtins.id}
+      513    0.000    0.000    0.000    0.000 {built-in method builtins.isinstance}
+  139/108    0.000    0.000    0.000    0.000 {built-in method builtins.issubclass}
+       28    0.000    0.000    0.000    0.000 {built-in method builtins.iter}
+       93    0.000    0.000    0.000    0.000 {built-in method builtins.len}
+       56    0.000    0.000    0.000    0.000 {built-in method builtins.next}
+       14    0.000    0.000    0.000    0.000 {built-in method builtins.repr}
+        1    0.000    0.000    0.000    0.000 {built-in method math.ceil}
+        1    0.000    0.000    0.000    0.000 {built-in method math.floor}
+       36    0.000    0.000    0.000    0.000 {built-in method posix.fspath}
+       12    0.000    0.000    0.000    0.000 {built-in method posix.getpid}
+       12    0.000    0.000    0.000    0.000 {built-in method sys._getframe}
+       14    0.000    0.000    0.000    0.000 {built-in method sys.getrecursionlimit}
+       12    0.000    0.000    0.000    0.000 {built-in method time.time}
+       14    0.000    0.000    0.000    0.000 {method '__enter__' of '_thread.lock' objects}
+       14    0.000    0.000    0.000    0.000 {method '__exit__' of '_thread.lock' objects}
+       14    0.000    0.000    0.000    0.000 {method 'acquire' of '_thread.lock' objects}
+        9    0.000    0.000    0.000    0.000 {method 'add' of 'set' objects}
+        7    0.000    0.000    0.000    0.000 {method 'append' of 'collections.deque' objects}
+       35    0.000    0.000    0.000    0.000 {method 'append' of 'list' objects}
+        7    0.000    0.000    0.000    0.000 {method 'decode' of 'bytes' objects}
+        1    0.000    0.000    0.000    0.000 {method 'disable' of '_lsprof.Profiler' objects}
+        7    0.000    0.000    0.000    0.000 {method 'discard' of 'set' objects}
+        7    0.000    0.000    0.000    0.000 {method 'encode' of 'str' objects}
+       14    0.000    0.000    0.000    0.000 {method 'end' of 're.Match' objects}
+        5    0.000    0.000    0.000    0.000 {method 'endswith' of 'str' objects}
+       55    0.000    0.000    0.000    0.000 {method 'format' of 'str' objects}
+       74    0.000    0.000    0.000    0.000 {method 'get' of 'dict' objects}
+       17    0.000    0.000    0.000    0.000 {method 'isidentifier' of 'str' objects}
+       14    0.000    0.000    0.000    0.000 {method 'items' of 'collections.OrderedDict' objects}
+        7    0.000    0.000    0.000    0.000 {method 'items' of 'dict' objects}
+        7    0.000    0.000    0.000    0.000 {method 'items' of 'mappingproxy' objects}
+        7    0.000    0.000    0.000    0.000 {method 'join' of 'str' objects}
+       48    0.000    0.000    0.000    0.000 {method 'keys' of 'dict' objects}
+       14    0.000    0.000    0.000    0.000 {method 'match' of 're.Pattern' objects}
+        5    0.000    0.000    0.000    0.000 {method 'pop' of 'dict' objects}
+        7    0.000    0.000    0.000    0.000 {method 'popleft' of 'collections.deque' objects}
+       36    0.000    0.000    0.000    0.000 {method 'rfind' of 'str' objects}
+       31    0.000    0.000    0.000    0.000 {method 'split' of 'str' objects}
+       12    0.000    0.000    0.000    0.000 {method 'startswith' of 'str' objects}
+       14    0.000    0.000    0.000    0.000 {method 'values' of 'mappingproxy' objects}
+
+
+MinMax took 0.248875059 seconds

@@ -5,6 +5,7 @@ import math
 import matplotlib.pyplot as plt
 import gc
 import time
+import cProfile
 
 def ak_create_akdict_from_df(df):
     akdict = {}
@@ -36,7 +37,22 @@ def cvt_YN_to_bool(v):
         return False
 
 
-ak.connect(connect_url='tcp://nlogin3:5555')
+def profile_function(ride_duration):
+    for i in range(1):
+        min1 = ride_duration.min()
+        max1 = ride_duration.max()
+        m1 = ride_duration.mean()
+        s1 = ride_duration.std()
+
+        # how long was the min/max ride to the next integer minute
+        min_ride = math.floor(ride_duration.min())
+        max_ride = math.ceil(ride_duration.max())
+        # print('done')
+        nBins = max_ride - min_ride
+        cnts = ak.histogram(ride_duration, bins=nBins)
+        s = cnts.sum
+
+ak.connect(connect_url='tcp://bc11u31n1:5555')
 
 # Read in yellow taxi data
 # per yellow data dictionary convert to data types Arkouda can handle
@@ -57,29 +73,19 @@ ride_duration = akdict['tpep_dropoff_datetime'] - akdict['tpep_pickup_datetime']
 # pull out ride duration in minutes
 ride_duration = ns_to_min(ride_duration)
 start = time.perf_counter()
-for i in range(1):
-    min1 = ride_duration.min()
-    max1 = ride_duration.max()
-    m1 = ride_duration.mean()
-    s1 = ride_duration.std()
-
-    # how long was the min/max ride to the next integer minute
-    min_ride = math.floor(ride_duration.min())
-    max_ride = math.ceil(ride_duration.max())
-    # print('done')
-
+ak.startTracing()
+cProfile.run('profile_function(ride_duration)')
+ak.stopTracing()
 end = time.perf_counter()
 print(f"MinMax took {end - start:0.9f} seconds")
-nBins = max_ride - min_ride
-cnts = ak.histogram(ride_duration, bins=nBins)
 #print(cnts)
 # histogram the ride time bin by the minute
 #start = time.perf_counter()
 #end = time.perf_counter()
-print("min = ", min1, "max = ", max1)
-print("mean = ", m1, "stdev = ", s1)
-print("min_ride = ", min_ride)
-print("max_ride = ", max_ride)
+#print("min = ", min1, "max = ", max1)
+#print("mean = ", m1, "stdev = ", s1)
+#print("min_ride = ", min_ride)
+#print("max_ride = ", max_ride)
 #print(f"histogram took {end - start:0.9f} seconds")
 
 # create bin edges because ak.histogram doesn't

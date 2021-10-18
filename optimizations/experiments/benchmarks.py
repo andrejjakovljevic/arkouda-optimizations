@@ -5,6 +5,7 @@ import time
 import random
 from scipy.sparse import csr_matrix
 import sys
+import cProfile
 
 def triangle_count_numpy(L:np.ndarray, nblocks_m, nblocks_n, nblocks_l, verbose):
     """
@@ -235,8 +236,8 @@ def get_matrices(filename):
             continue
         if (i>0):
             spl = x.split(' ')
-            f = int(spl[0])
-            s = int(spl[1])
+            f = int(spl[0])-1
+            s = int(spl[1])-1
             data = 1
             fs.append(f)
             ss.append(s)
@@ -245,7 +246,7 @@ def get_matrices(filename):
             datas.append(data)
             datas.append(data)
         i+=1
-    s_mat = csr_matrix((datas,(fs, ss)), shape=(6, 6))
+    s_mat = csr_matrix((datas,(fs, ss)), shape=(shape_size, shape_size))
     #s_mat_t = s_mat.transpose(axes = None, copy=True)
     return (s_mat)
 def create_blocks_scalar(A: np.ndarray):
@@ -307,7 +308,7 @@ x = np.array([[0, 0, 0, 0],
 # print(triangle_count_numpy(x, 2, 2, 2, False))
 
 
-ak.connect(connect_url='tcp://bc9u23n1:5555')
+ak.connect(connect_url='tcp://bc6u11n7:5555')
 # x = ak.randint(0, 10, 100)
 # y = ak.randint(0, 10, 100)
 # z = x + y
@@ -319,16 +320,17 @@ dense1 = s_mat.todense().tolist()
 #print(s_mat)
 mat = create_blocks_scalar(np.array(dense1,np.int64))
 start = time.perf_counter()
-#s = ak.betwennessCentrality(0,mat)
-#print(s)
+ak.startTracing()
+cProfile.run('ak.sum(betweenness_centrality(mat,0))')
+ak.stopTracing()
 end = time.perf_counter()
 print(f"on chapel betwenness centrality took {end - start:0.9f} seconds")
-start = time.perf_counter()
-s = ak.sum(betweenness_centrality(mat,0))
-print(s)
+#start = time.perf_counter()
+#s = ak.sum(betweenness_centrality(mat,0))
+#print(s)
 #s = betweenness_centrality_1d()
-end = time.perf_counter()
-print(f"on client betwenness centrality took {end - start:0.9f} seconds")
+#end = time.perf_counter()
+#print(f"on client betwenness centrality took {end - start:0.9f} seconds")
 
 # start = time.perf_counter()
 # x = ak.randint(0, 5, 10)

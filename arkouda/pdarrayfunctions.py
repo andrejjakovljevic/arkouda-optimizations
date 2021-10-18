@@ -13,7 +13,7 @@ from arkouda.strings import Strings
 from arkouda.pdarraycreation import array, from_series
 
 __all__ = ["count_frequencies", "move_records", "cumsum", "remove_duplicates", "make_from_csv", "transpose", "triangle_count", "triangle_count_sparse",
-           "vector_times_matrix", "inverse", "matrix_times_vector", "betwennessCentrality"]
+           "vector_times_matrix", "inverse", "matrix_times_vector", "betwennessCentrality", "half_of_triangle_count", "startTracing", "stopTracing"]
 
 def count_frequencies(a: pdarray, b: pdarray, n: int, l: list) -> int:
     cmd = "count_frequencies"
@@ -222,4 +222,22 @@ def betwennessCentrality(source: int, list_of_arrays: list):
     arr = pdarray(cmd, args, akfloat64, pda1.size, pda1.ndim, pda1.shape, akfloat64.itemsize)
     generic_msg(cmd, args, create_pdarray=True, arr_id=arr.name, my_pdarray=[list_of_arrays+[arr]])
     return arr
+
+def half_of_triangle_count(n, k, pd_pointers, pd_pointers2, pd_indexes, pd_indexes2):
+    args = str(n)+" "+ str(k)+ " "+pd_pointers.name+" "+pd_pointers2.name+" "+pd_indexes.name+" "+pd_indexes2.name
+    cmd = "half_of_triangle_count"
+    repMsg = generic_msg(cmd, args, return_value_needed=True, my_pdarray=[pd_pointers, pd_pointers2, pd_indexes, pd_indexes2])
+    k = repMsg.split(' ')[1]
+    return int(k)
+
+def startTracing():
+    cmd = "startProfile"
+    args = ""
+    generic_msg(cmd, args, return_value_needed=True, arr_id="", my_pdarray=[])
+
+def stopTracing():
+    cmd = "endProfile"
+    args = ""
+    generic_msg(cmd, args, return_value_needed=True, arr_id="", my_pdarray=[])
+
 

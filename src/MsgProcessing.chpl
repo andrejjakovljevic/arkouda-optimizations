@@ -1,4 +1,3 @@
-
 module MsgProcessing
 {
     use ServerConfig;
@@ -180,6 +179,7 @@ module MsgProcessing
     :returns: MsgTuple
     */
     proc deleteMsg(cmd: string, payload: string, st: borrowed SymTab): MsgTuple throws {
+        if (isTracing) then delwatch.start();
         var repMsg: string; // response message
         // split request into fields
         var (name) = payload.splitMsgToTuple(1);
@@ -192,7 +192,8 @@ module MsgProcessing
         else {
             repMsg = "registered symbol, %s, not deleted".format(name);
         }
-        mpLogger.debug(getModuleName(),getRoutineName(),getLineNumber(),repMsg);       
+        mpLogger.debug(getModuleName(),getRoutineName(),getLineNumber(),repMsg);   
+        if (isTracing) then delwatch.stop();
         return new MsgTuple(repMsg, MsgType.NORMAL);
     }
 
@@ -1542,7 +1543,6 @@ module MsgProcessing
             p = p + q;
             var s: string;
             q = vector_times_matrix(st, n, "float64","int64",input_names,q);
-            writeln("q=",q);
             q = q*inverse(p);
             sum = + reduce q;
             d+=1;
@@ -1564,6 +1564,45 @@ module MsgProcessing
         var repMsg: string = "created %s".format(st.attrib(res_name));
         omLogger.debug(getModuleName(),getRoutineName(),getLineNumber(),repMsg);
         return new MsgTuple(repMsg, MsgType.NORMAL);
+    }
+
+    proc halfOfTriCountMsg(cmd: string, payload: string, st: borrowed SymTab) : MsgTuple throws {
+        param pn = Reflection.getRoutineName();
+        var (nStr, kStr, name1, name2, name3, name4) = payload.splitMsgToTuple(6);
+        var n: int = nStr: int;
+        var i: int = kStr: int;
+        var pointer: borrowed GenSymEntry = st.lookup(name1);
+        var pointer2: borrowed GenSymEntry = st.lookup(name3);
+        var p = toSymEntry(pointer, int);
+        var p2 = toSymEntry(pointer2, int);
+        var indexes: borrowed GenSymEntry = st.lookup(name2);
+        var indexes2: borrowed GenSymEntry = st.lookup(name4);
+        var indexesReal = toSymEntry(indexes, int);
+        var indexesReal2 = toSymEntry(indexes2, int);
+        var locS: int = 0;
+        if (p.a[i]<p.a[i+1]) then {
+            coforall j in p.a[i]..p.a[i+1]-1 with (+ reduce locS) {
+                var first = splice(i, p.a, indexesReal.a);
+                var second = splice(indexesReal.a[j], p2.a, indexesReal2.a);
+                locS += mergeArraysCount(first, second, p.a[i],p2.a[indexesReal.a[j]]);
+            }
+        }
+        var repMsg: string = "int64 %i".format(locS);
+        return new MsgTuple(repMsg, MsgType.NORMAL); 
+    }
+
+    proc startCountingMsg(cmd: string, payload: string, st: borrowed SymTab) : MsgTuple throws {
+        param pn = Reflection.getRoutineName();
+        var repMsg: string = "done";
+        isTracing = true;
+        return new MsgTuple(repMsg, MsgType.NORMAL); 
+    }
+
+    proc stopCountingMsg(cmd: string, payload: string, st: borrowed SymTab) : MsgTuple throws {
+        param pn = Reflection.getRoutineName();
+        var repMsg: string = "done";
+        isTracing = false;
+        return new MsgTuple(repMsg, MsgType.NORMAL); 
     }
 
 }

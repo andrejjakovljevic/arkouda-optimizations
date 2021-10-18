@@ -21,7 +21,7 @@ module GenSymIO {
     use ServerConfig;
     use Search;
     use IndexingMsg;
-    
+
     private config const logLevel = ServerConfig.logLevel;
     const gsLogger = new Logger(logLevel);
 
@@ -41,7 +41,6 @@ module GenSymIO {
         var msgType = MsgType.NORMAL;
         var msg:string = "";
         var rname:string = "";
-
         var (dtypeBytes, sizeBytes, data) = payload.splitMsgToTuple(b" ", 3);
         var dtype = DType.UNDEF;
         var size:int;

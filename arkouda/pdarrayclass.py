@@ -18,11 +18,14 @@ from collections import defaultdict
 from arkouda.infoclass import list_registry, information, pretty_print_information
 import builtins
 import weakref
+import time
 
 __all__ = ["pdarray", "clear", "any", "all", "is_sorted", "sum", "prod",
            "min", "max", "argmin", "argmax", "mean", "var", "std", "mink",
            "maxk", "argmink", "argmaxk", "attach_pdarray",
-           "RegistrationError", "multAndStore", "binOpWithStore"]
+           "RegistrationError", "multAndStore", "binOpWithStore", "startAllDell"]
+
+startAllDell = time.perf_counter()
 
 logger = getArkoudaLogger(name='pdarrayclass')
 

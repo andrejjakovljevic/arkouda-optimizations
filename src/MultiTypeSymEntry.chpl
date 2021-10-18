@@ -110,11 +110,13 @@ module MultiTypeSymEntry
         :type etype: type
         */
         proc init(len: int, type etype) {
+            if (isTracing) then watch.start();
             live = live + 1;
             if (live>maxi) then maxi=live;
             super.init(etype, len);
             this.etype = etype;
             this.aD = makeDistDom(len);
+            if (isTracing) then watch.stop();
             // this.a uses default initialization
         }
 
@@ -124,14 +126,14 @@ module MultiTypeSymEntry
         :type a: [] ?etype
         */
         proc init(a: [?D] ?etype) {
-            watch.start();
+            if (isTracing) then watch.start();
             live = live + 1;
             if (live>maxi) then maxi=live;
             super.init(etype, D.size);
             this.etype = etype;
             this.aD = D;
             this.a = a;
-            watch.stop();
+            if (isTracing) then watch.stop();
         }
 
         /*

@@ -4,6 +4,7 @@ import numpy as np
 from scipy.sparse import csr_matrix
 import time
 import sys
+import cProfile
 
 def create_blocks_scalar(A: np.ndarray):
     out = []
@@ -55,9 +56,12 @@ def triangle_count(A: list, At: list) -> int:
 def triangle_count_on_chapel(A: list) -> int:
     return ak.triangle_count(A)
 
+def to_profile(pd_out, pd_out_t):
+    return triangle_count(pd_out, pd_out_t)
+
 x = np.random.randint(2, size=(2, 2))
 f = open("result+tr_base.txt", "a")
-ak.connect(connect_url='tcp://bc12u19n2:5555')
+ak.connect(connect_url='tcp://bc9u19n6:5555')
 out = create_blocks_scalar(x)
 (s_mat, s_mat_t) = get_matrices("/home/an58/"+sys.argv[1]+".mtx")
 dense1 = s_mat.todense().tolist()
@@ -65,14 +69,16 @@ dense2 = s_mat_t.todense().tolist()
 pd_out = create_blocks_scalar(np.array(dense1,np.int64))
 pd_out_t = create_blocks_scalar(np.array(dense2, np.int64))
 start = time.perf_counter()
-print(triangle_count(pd_out, pd_out_t))
+ak.startTracing()
+cProfile.run('to_profile(pd_out, pd_out_t)')
+ak.stopTracing()
 end = time.perf_counter()
 exec_time = end - start
 print(f"transpose_v0 took {end - start:0.9f} seconds")
 #f.write(sys.argv[1]+"\n")
 #f.write(f"{exec_time:0.9f}\n")
-start = time.perf_counter()
-print(ak.triangle_count(pd_out))
-end = time.perf_counter()
-print(f"transpose_v1 took {end - start:0.9f} seconds")
+#start = time.perf_counter()
+#print(ak.triangle_count(pd_out))
+#end = time.perf_counter()
+#print(f"transpose_v1 took {end - start:0.9f} seconds")
 ak.shutdown()

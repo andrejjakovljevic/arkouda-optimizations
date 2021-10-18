@@ -122,6 +122,7 @@ module MultiTypeSymbolTable
         :returns: borrow of newly created GenSymEntry
         */
         proc addEntry(name: string, in entry: shared GenSymEntry): borrowed GenSymEntry throws {
+            if (isTracing) then rwatch.start();
             // check and throw if memory limit would be exceeded
             overMemLimit(entry.size*entry.itemsize);
             if (tab.contains(name)) {
@@ -134,6 +135,7 @@ module MultiTypeSymbolTable
 
             tab.addOrSet(name, entry);
 
+            if (isTracing) then rwatch.stop();
             return tab.getBorrowed(name);
         }
 
@@ -151,6 +153,7 @@ module MultiTypeSymbolTable
         :returns: borrow of newly created GenSymEntry
         */
         proc addEntry(name: string, len: int, dtype: DType): borrowed GenSymEntry throws {
+            if (isTracing) then rwatch.start();
             select dtype {
                 when DType.Int64 { return addEntry(name, len, int); }
                 when DType.Float64 { return addEntry(name, len, real); }
@@ -165,6 +168,7 @@ module MultiTypeSymbolTable
                         errorClass="IllegalArgumentError");
                 }
             }
+            if (isTracing) then rwatch.stop();
         }
 
         /*

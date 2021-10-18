@@ -26,8 +26,16 @@ const asLogger = new Logger(logLevel);
 
 var watch = new Time.Timer();
 watch.clear();
+var rwatch = new Time.Timer();
+rwatch.clear();
+var delwatch = new Time.Timer();
+delwatch.clear();
+var del0 = delwatch.elapsed();
+var compWatch = new Time.Timer();
+var comp0 = compWatch.elapsed();
 var live: int = 0;
 var maxi: int = 0;
+var isTracing: bool = false;
 
 proc initArkoudaDirectory() {
     var arkDirectory = '%s%s%s'.format(here.cwd(), pathSep,'.arkouda');
@@ -164,7 +172,7 @@ proc main() {
     :arg repMsg: either a string or bytes to be sent
     */
     proc sendRepMsg(repMsg: ?t) throws where t==string || t==bytes {
-        repCount += 1;
+        if (isTracing) then repCount += 1;
         if trace {
           if t==bytes {
               asLogger.info(getModuleName(),getRoutineName(),getLineNumber(),
@@ -224,7 +232,7 @@ proc main() {
     while !shutdownServer {
         // receive message on the zmq socket
         var reqMsgRaw = socket.recv(bytes);
-
+        
         reqCount += 1;
 
         var s0 = t1.elapsed();
@@ -277,7 +285,7 @@ proc main() {
               try {
                 if (cmd != "array" && cmd != "get_from_csv") {
                   asLogger.info(getModuleName(), getRoutineName(), getLineNumber(),
-                                                     ">>> %t %s".format(cmd, args));
+                                                     ">>> %t".format(cmd));
                 } else {
                   asLogger.info(getModuleName(), getRoutineName(), getLineNumber(),
                                                      ">>> %s [binary data]".format(cmd));
@@ -301,8 +309,8 @@ proc main() {
                     cout.close();
                     fout.close();
                     asLogger.info(getModuleName(),getRoutineName(),getLineNumber(),
-                                         "<<< shutdown initiated by %s took %.17r sec, time spent creating stuff %.17r ms, max live %i".format(user, 
-                                                   t1.elapsed() - s0, watch.elapsed(TimeUnits.milliseconds), maxi));
+                                         "<<< shutdown initiated by %s took %.17r sec, time spent creating stuff %.17r ms, also maybe %.17r ms, max live %i, deleted %.17r s, functions %.17r s".format(user, 
+                                                   t1.elapsed() - s0, rwatch.elapsed(TimeUnits.milliseconds), watch.elapsed(TimeUnits.milliseconds), maxi, delwatch.elapsed()-del0, compWatch.elapsed()-comp0));
                 }
                 break;
             }
@@ -315,6 +323,7 @@ proc main() {
             var binaryRepMsg: bytes;
             var repTuple: MsgTuple;
             //num = num +1;
+            if (isTracing) then compWatch.start();
             select cmd
             {
                 when "array"             {repTuple = arrayMsg(cmd, payload, st);}
@@ -411,6 +420,9 @@ proc main() {
                 when "inverse_vector"    {repTuple = inverseVectorMsg(cmd, args, st);}
                 when "inverse_vector_store" {repTuple = inverseVectorMsgStore(cmd, args, st);}
                 when "betwenness_centrality" {repTuple = betweennessCentralityMsg(cmd, args, st);}
+                when "half_of_triangle_count" {repTuple = halfOfTriCountMsg(cmd, args, st);}
+                when "startProfile" {repTuple = startCountingMsg(cmd, args, st);}
+                when "endProfile" {repTuple = stopCountingMsg(cmd, args, st);}
                 when "connect" {
                     if authenticate {
                         repTuple = new MsgTuple("connected to arkouda server tcp://*:%i as user %s with token %s".format(
@@ -435,7 +447,7 @@ proc main() {
                     asLogger.error(getModuleName(),getRoutineName(),getLineNumber(),repTuple.msg);
                 }
             }
-
+            if (isTracing) then compWatch.stop();
             /*
              * 1. Determine if the reply message is binary or a string via the repTuple.msg attribute
              * 2. If a string, invoke serialize to generate a JSON-formatted reply string
